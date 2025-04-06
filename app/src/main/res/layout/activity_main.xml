@@ -21,12 +21,29 @@
         android:id="@+id/imageView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:visibility="invisible" 
+        android:visibility="invisible"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        android:contentDescription="@string/loaded_image_description" /> 
+        android:contentDescription="@string/loaded_image_description" />
+
+    <!-- CheckBox для управления видимостью контролов -->
+    <CheckBox
+        android:id="@+id/controlsVisibilityCheckbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="@string/show_controls"
+        android:checked="true"
+        android:textColor="@android:color/white"
+        android:shadowColor="@android:color/black"
+        android:shadowDx="1"
+        android:shadowDy="1"
+        android:shadowRadius="2"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
 
     <!-- Кнопка выбора изображения -->
     <Button
@@ -36,7 +53,7 @@
         android:layout_margin="16dp"
         android:text="@string/pick_image"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent" /> <!-- Помещен сверху, как и раньше -->
 
     <!-- SeekBar для прозрачности -->
     <SeekBar
@@ -53,4 +70,3 @@
         app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
-

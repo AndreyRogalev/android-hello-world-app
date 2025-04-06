@@ -27,6 +27,8 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.CheckBox; // Импорт CheckBox
+import android.widget.CompoundButton; // Импорт для слушателя
 import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.Toast;
@@ -54,6 +56,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private static final String KEY_SCALE_FACTOR = "scaleFactor";
     private static final String KEY_ROTATION_ANGLE = "rotationAngle";
     private static final String KEY_MATRIX_VALUES = "matrixValues"; // Сохраняем всю матрицу
+    private static final String KEY_CONTROLS_VISIBLE = "controlsVisible"; // Ключ для состояния CheckBox
 
     // UI Элементы
     private ImageView imageView;
@@ -61,6 +64,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private Button pickImageButton;
     private SurfaceView cameraSurfaceView;
     private SurfaceHolder cameraSurfaceHolder;
+    private CheckBox controlsVisibilityCheckbox; // Переменная для CheckBox
 
     // Камера
     private Camera camera;
@@ -115,6 +119,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         transparencySeekBar = findViewById(R.id.transparencySeekBar);
         pickImageButton = findViewById(R.id.pickImageButton);
         cameraSurfaceView = findViewById(R.id.cameraSurfaceView);
+        controlsVisibilityCheckbox = findViewById(R.id.controlsVisibilityCheckbox); // Инициализация CheckBox
 
         // Настройка ImageView для трансформаций
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
@@ -133,6 +138,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
+        // Настройка слушателя для CheckBox
+        controlsVisibilityCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            updateControlsVisibility(isChecked); // Вызов метода обновления видимости и текста
+        });
+
         // Настройка распознавания жестов
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleListener());
         imageView.setOnTouchListener(new MyTouchListener()); // Устанавливаем наш кастомный листенер
@@ -140,14 +150,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         // Настройка SurfaceHolder для камеры
         cameraSurfaceHolder = cameraSurfaceView.getHolder();
         cameraSurfaceHolder.addCallback(this);
-        // Для старых версий Android (уже не так актуально, но не повредит)
-        // cameraSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 
         // Запрос разрешения на использование камеры при старте
         checkCameraPermission();
 
 
         // --- Восстановление состояния ---
+        boolean restoredControlsVisible = true; // По умолчанию контролы видимы
         if (savedInstanceState != null) {
             Log.d(TAG, "Restoring state...");
             String savedUriString = savedInstanceState.getString(KEY_IMAGE_URI);
@@ -176,14 +185,52 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
              }
              setImageAlpha(transparencySeekBar.getProgress()); // Восстанавливаем прозрачность
 
+             // Восстановление состояния CheckBox и видимости контролов
+             restoredControlsVisible = savedInstanceState.getBoolean(KEY_CONTROLS_VISIBLE, true);
+             controlsVisibilityCheckbox.setChecked(restoredControlsVisible);
+             Log.d(TAG, "Restored controlsVisible (isChecked): " + restoredControlsVisible);
+
         } else {
              Log.d(TAG, "No saved state found.");
+             // Если нет сохраненного состояния, берем состояние CheckBox из XML
+             restoredControlsVisible = controlsVisibilityCheckbox.isChecked();
         }
         // --- Конец восстановления состояния ---
+
+        // Установка начальной видимости и текста контролов
+        updateControlsVisibility(restoredControlsVisible);
     }
 
-    // --- Управление разрешениями ---
+    /**
+     * Обновляет видимость кнопки, слайдера и текст CheckBox.
+     * Сам CheckBox (квадратик) всегда остается видимым.
+     * @param show true, чтобы показать контролы и текст; false, чтобы скрыть их и текст.
+     */
+    private void updateControlsVisibility(boolean show) {
+        int visibility = show ? View.VISIBLE : View.GONE;
+        // Получаем текст для чекбокса или пустую строку
+        String checkboxText = show ? getString(R.string.show_controls) : ""; // Используем строку из ресурсов
 
+        // Устанавливаем видимость для кнопки и слайдера
+        if (pickImageButton != null) {
+            pickImageButton.setVisibility(visibility);
+        }
+        if (transparencySeekBar != null) {
+            transparencySeekBar.setVisibility(visibility);
+        }
+
+        // Устанавливаем текст для CheckBox
+        if (controlsVisibilityCheckbox != null) {
+            controlsVisibilityCheckbox.setText(checkboxText);
+            // controlsVisibilityCheckbox.setVisibility(View.VISIBLE); // Убедимся, что сам чекбокс виден
+        }
+
+        Log.d(TAG, "Controls visibility updated: " + (show ? "VISIBLE" : "GONE") + ", Checkbox text " + (show ? "shown" : "hidden"));
+    }
+
+
+    // --- Управление разрешениями ---
+    // ... (код без изменений) ...
     private void checkCameraPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -243,8 +290,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    // --- Выбор и загрузка изображения ---
 
+    // --- Выбор и загрузка изображения ---
+    // ... (код без изменений) ...
     private void openImagePicker() {
         Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         // intent.setType("image/*"); // Можно использовать ACTION_GET_CONTENT
@@ -418,8 +466,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     // --- Манипуляции с изображением (Трансформации) ---
-
-     // Сброс трансформаций и центрирование/масштабирование изображения по размеру ImageView
+    // ... (код без изменений) ...
      private void resetTransformationsAndFit() {
          if (originalBitmap == null || imageView.getWidth() == 0 || imageView.getHeight() == 0) {
              Log.w(TAG, "Cannot reset/fit image: Bitmap is null or ImageView dimensions are zero.");
@@ -519,8 +566,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     // --- Обработка жестов (Внутренние классы) ---
-
-    // Слушатель для масштабирования (Pinch-to-Zoom)
+    // ... (код без изменений) ...
+     // Слушатель для масштабирования (Pinch-to-Zoom)
     private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
         @Override
         public boolean onScale(ScaleGestureDetector detector) {
@@ -700,7 +747,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
 
     // --- Управление камерой (SurfaceHolder.Callback и связанные методы) ---
-
+    // ... (код без изменений) ...
     @Override
     public void surfaceCreated(@NonNull SurfaceHolder holder) {
         Log.d(TAG, "Surface created.");
@@ -1017,7 +1064,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
 
     // --- Методы жизненного цикла Activity ---
-
+    // ... (код без изменений) ...
     @Override
     protected void onResume() {
         super.onResume();
@@ -1102,9 +1149,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
              Log.d(TAG,"No bitmap, not saving transformation state.");
         }
 
-        // ID камеры сохранять не обязательно, если мы всегда начинаем с задней
-        // Но если бы была кнопка переключения, его бы стоило сохранить.
-        // outState.putInt("cameraId", currentCameraId);
+        // Сохранение состояния CheckBox (включен/выключен)
+        if (controlsVisibilityCheckbox != null) {
+            outState.putBoolean(KEY_CONTROLS_VISIBLE, controlsVisibilityCheckbox.isChecked());
+            Log.d(TAG, "Saved controlsVisible (isChecked): " + controlsVisibilityCheckbox.isChecked());
+        }
     }
 
 
@@ -1149,4 +1198,4 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
               Log.w(TAG,"Surface not ready after camera switch, camera will start later via surfaceCreated/Changed.");
          }
      }
-}
+} // <<< Конец класса MainActivity >>>
