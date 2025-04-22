@@ -577,7 +577,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
              scaleFactor *= detector.getScaleFactor();
 
              // Ограничиваем масштаб, чтобы избежать слишком большого/маленького изображения
-             scaleFactor = Math.max(0.1f, Math.min(scaleFactor, 5.0f));
+             scaleFactor = Math.max(0.1f, Math.min(scaleFactor, 10.0f));
 
              float scaleChange = scaleFactor / previousScaleFactor; // На сколько изменился масштаб в этот раз
 
