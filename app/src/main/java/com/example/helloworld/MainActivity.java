@@ -2,6 +2,7 @@ package com.example.helloworld;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -35,7 +36,6 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.Toast;
@@ -44,6 +44,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -51,7 +53,7 @@ import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
+public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback, LayerAdapter.OnLayerVisibilityChangedListener {
 
     private static final String TAG = "MainActivity";
     private static final int PICK_IMAGE_REQUEST = 1;
@@ -73,8 +75,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private SurfaceHolder cameraSurfaceHolder;
     private CheckBox controlsVisibilityCheckbox;
     private Switch pencilModeSwitch;
-    private LinearLayout layerControls;
-    private CheckBox[] layerCheckBoxes;
+    private Button layerSelectButton;
 
     // Камера
     private Camera camera;
@@ -137,7 +138,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         cameraSurfaceView = findViewById(R.id.cameraSurfaceView);
         controlsVisibilityCheckbox = findViewById(R.id.controlsVisibilityCheckbox);
         pencilModeSwitch = findViewById(R.id.pencilModeSwitch);
-        layerControls = findViewById(R.id.layerControls);
+        layerSelectButton = findViewById(R.id.layerSelectButton);
 
         // Настройка ImageView для трансформаций
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
@@ -164,42 +165,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         // Слушатель для Switch карандашного режима
         pencilModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isPencilMode = isChecked;
-            layerControls.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+            layerSelectButton.setVisibility(isChecked ? View.VISIBLE : View.GONE);
             updateImageDisplay();
         });
 
-        // Инициализация CheckBox для слоев в порядке твердости
-        layerCheckBoxes = new CheckBox[] {
-                findViewById(R.id.layer9H),    // 0: 9H
-                findViewById(R.id.layer8H),    // 1: 8H
-                findViewById(R.id.layer7H),    // 2: 7H
-                findViewById(R.id.layer6H),    // 3: 6H
-                findViewById(R.id.layer5H),    // 4: 5H
-                findViewById(R.id.layer4H),    // 5: 4H
-                findViewById(R.id.layer3H),    // 6: 3H
-                findViewById(R.id.layer2H),    // 7: 2H
-                findViewById(R.id.layerH),     // 8: H
-                findViewById(R.id.layerF),     // 9: F
-                findViewById(R.id.layerHB),    // 10: HB
-                findViewById(R.id.layerB),     // 11: B
-                findViewById(R.id.layer2B),    // 12: 2B
-                findViewById(R.id.layer3B),    // 13: 3B
-                findViewById(R.id.layer4B),    // 14: 4B
-                findViewById(R.id.layer5B),    // 15: 5B
-                findViewById(R.id.layer6B),    // 16: 6B
-                findViewById(R.id.layer7B),    // 17: 7B
-                findViewById(R.id.layer8B),    // 18: 8B
-                findViewById(R.id.layer9B)     // 19: 9B
-        };
+        // Слушатель для кнопки выбора слоев
+        layerSelectButton.setOnClickListener(v -> showLayerSelectionDialog());
 
-        // Установка слушателей для CheckBox слоев
-        for (int i = 0; i < layerCheckBoxes.length; i++) {
-            final int index = i;
+        // Инициализация layerVisibility
+        for (int i = 0; i < layerVisibility.length; i++) {
             layerVisibility[i] = true;
-            layerCheckBoxes[i].setOnCheckedChangeListener((buttonView, isChecked) -> {
-                layerVisibility[index] = isChecked;
-                updateImageDisplay();
-            });
         }
 
         // Настройка распознавания жестов
@@ -251,16 +226,32 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 System.arraycopy(savedLayerVisibility, 0, layerVisibility, 0, layerVisibility.length);
             }
             pencilModeSwitch.setChecked(isPencilMode);
-            layerControls.setVisibility(isPencilMode ? View.VISIBLE : View.GONE);
-            for (int i = 0; i < layerCheckBoxes.length; i++) {
-                layerCheckBoxes[i].setChecked(layerVisibility[i]);
-            }
+            layerSelectButton.setVisibility(isPencilMode ? View.VISIBLE : View.GONE);
         } else {
             Log.d(TAG, "No saved state found.");
             restoredControlsVisible = controlsVisibilityCheckbox.isChecked();
         }
 
         updateControlsVisibility(restoredControlsVisible);
+    }
+
+    private void showLayerSelectionDialog() {
+        Dialog dialog = new Dialog(this);
+        dialog.setContentView(R.layout.dialog_layer_selection);
+        dialog.setTitle(R.string.layer_selection_title);
+
+        RecyclerView recyclerView = dialog.findViewById(R.id.layerRecyclerView);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        LayerAdapter adapter = new LayerAdapter(PENCIL_HARDNESS, layerVisibility, this);
+        recyclerView.setAdapter(adapter);
+
+        dialog.show();
+    }
+
+    @Override
+    public void onLayerVisibilityChanged(int position, boolean isVisible) {
+        layerVisibility[position] = isVisible;
+        updateImageDisplay();
     }
 
     private void updateControlsVisibility(boolean show) {
@@ -275,6 +266,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
         if (pencilModeSwitch != null) {
             pencilModeSwitch.setVisibility(visibility);
+        }
+        if (layerSelectButton != null) {
+            layerSelectButton.setVisibility(show && isPencilMode ? View.VISIBLE : View.GONE);
         }
         if (controlsVisibilityCheckbox != null) {
             controlsVisibilityCheckbox.setText(checkboxText);
