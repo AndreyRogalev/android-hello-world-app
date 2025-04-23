@@ -83,7 +83,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/controlsVisibilityCheckbox" />
 
-    <!-- LinearLayout для CheckBox слоев (H2, H, HB, B, B2, B4, B6, B8, Black, White) -->
+    <!-- LinearLayout для CheckBox слоев (H2, H, HB, B, B2, B4, B6, B8) -->
     <LinearLayout
         android:id="@+id/layerControls"
         android:layout_width="wrap_content"
@@ -95,7 +95,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/pencilModeSwitch">
 
-        <!-- H2 (самый твердый) -->
+        <!-- H2 (самый твердый, теперь включает белый) -->
         <CheckBox
             android:id="@+id/layerH2"
             android:layout_width="wrap_content"
@@ -186,38 +186,12 @@
             android:shadowDy="1"
             android:shadowRadius="2" />
 
-        <!-- B8 -->
+        <!-- B8 (самый мягкий, теперь включает черный) -->
         <CheckBox
             android:id="@+id/layerB8"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="B8"
-            android:checked="true"
-            android:textColor="@android:color/white"
-            android:shadowColor="@android:color/black"
-            android:shadowDx="1"
-            android:shadowDy="1"
-            android:shadowRadius="2" />
-
-        <!-- Black -->
-        <CheckBox
-            android:id="@+id/layerBlack"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/layer_black"
-            android:checked="true"
-            android:textColor="@android:color/white"
-            android:shadowColor="@android:color/black"
-            android:shadowDx="1"
-            android:shadowDy="1"
-            android:shadowRadius="2" />
-
-        <!-- White -->
-        <CheckBox
-            android:id="@+id/layerWhite"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/layer_white"
             android:checked="true"
             android:textColor="@android:color/white"
             android:shadowColor="@android:color/black"
