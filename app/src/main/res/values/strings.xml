@@ -4,4 +4,6 @@
     <string name="loaded_image_description">Loaded image</string>
     <string name="show_controls">Show Controls</string>
     <string name="pick_image">Pick Image</string>
+     <string name="layer_black">Black</string>
+    <string name="layer_white">White</string>
 </resources>

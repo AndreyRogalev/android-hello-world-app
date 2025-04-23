@@ -86,14 +86,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private Matrix matrix = new Matrix();
     private float scaleFactor = 1.0f;
     private float rotationAngle = 0.0f;
-    private Uri currentImageUri; // Добавлено поле для хранения URI изображения
+    private Uri currentImageUri;
 
     // Карандашный режим
     private boolean isPencilMode = false;
     private Bitmap pencilBitmap;
     private Bitmap[] layerBitmaps;
-    private boolean[] layerVisibility = new boolean[8];
-    private static final String[] PENCIL_HARDNESS = {"H2", "H", "HB", "B", "B2", "B4", "B6", "B8"};
+    private boolean[] layerVisibility = new boolean[10]; // Расширено до 10 для Black и White
+    private static final String[] PENCIL_HARDNESS = {"H2", "H", "HB", "B", "B2", "B4", "B6", "B8", "Black", "White"};
 
     // Распознавание жестов
     private ScaleGestureDetector scaleGestureDetector;
@@ -174,7 +174,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 findViewById(R.id.layerB2),
                 findViewById(R.id.layerB4),
                 findViewById(R.id.layerB6),
-                findViewById(R.id.layerB8)
+                findViewById(R.id.layerB8),
+                findViewById(R.id.layerBlack),
+                findViewById(R.id.layerWhite)
         };
 
         // Установка слушателей для CheckBox слоев
@@ -566,8 +568,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         paint.setColorFilter(filter);
         canvas.drawBitmap(originalBitmap, 0, 0, paint);
 
-        layerBitmaps = new Bitmap[8];
-        for (int i = 0; i < 8; i++) {
+        layerBitmaps = new Bitmap[10]; // Расширено до 10 для Black и White
+        for (int i = 0; i < 10; i++) {
             layerBitmaps[i] = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
             layerBitmaps[i].eraseColor(Color.TRANSPARENT);
         }
@@ -578,7 +580,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         for (int i = 0; i < pixels.length; i++) {
             int gray = Color.red(pixels[i]);
             int layerIndex = getLayerIndex(gray);
-            if (layerIndex >= 0 && layerIndex < 8) {
+            if (layerIndex >= 0 && layerIndex < 10) {
                 layerBitmaps[layerIndex].setPixel(i % originalBitmap.getWidth(), i / originalBitmap.getWidth(), pixels[i]);
             }
         }
@@ -587,6 +589,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private int getLayerIndex(int grayValue) {
+        if (grayValue == 255) return 9; // White
         if (grayValue >= 224) return 0; // H2
         if (grayValue >= 192) return 1; // H
         if (grayValue >= 160) return 2; // HB
@@ -594,7 +597,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (grayValue >= 96) return 4; // B2
         if (grayValue >= 64) return 5; // B4
         if (grayValue >= 32) return 6; // B6
-        return 7; // B8
+        if (grayValue > 0) return 7; // B8
+        return 8; // Black (grayValue == 0)
     }
 
     private void updateImageDisplay() {
