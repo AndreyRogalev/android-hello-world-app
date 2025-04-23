@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Camera Overlay App</string>
-    <string name="pick_image">Image</string>
-    <string name="show_controls">Show</string>
-    <string name="loaded_image_description">Loaded image from gallery</string>
+    <string name="pencil_mode">Pencil Mode</string>
+    <string name="loaded_image_description">Loaded image</string>
+    <string name="show_controls">Show Controls</string>
+    <string name="pick_image">Pick Image</string>
 </resources>

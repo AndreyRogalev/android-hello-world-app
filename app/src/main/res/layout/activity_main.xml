@@ -44,7 +44,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-
     <!-- Кнопка выбора изображения -->
     <Button
         android:id="@+id/pickImageButton"
@@ -53,7 +52,7 @@
         android:layout_margin="16dp"
         android:text="@string/pick_image"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" /> <!-- Помещен сверху, как и раньше -->
+        app:layout_constraintTop_toTopOf="parent" />
 
     <!-- SeekBar для прозрачности -->
     <SeekBar
@@ -68,5 +67,129 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Switch для включения/выключения карандашного режима -->
+    <Switch
+        android:id="@+id/pencilModeSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="@string/pencil_mode"
+        android:textColor="@android:color/white"
+        android:shadowColor="@android:color/black"
+        android:shadowDx="1"
+        android:shadowDy="1"
+        android:shadowRadius="2"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/controlsVisibilityCheckbox" />
+
+    <!-- LinearLayout для CheckBox слоев (H2, H, HB, B, B2, B4, B6, B8) -->
+    <LinearLayout
+        android:id="@+id/layerControls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/pencilModeSwitch">
+
+        <CheckBox
+            android:id="@+id/layerH2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="H2 Layer"
+            android:checked="true"
+            android:textColor="@android:color/white"
+            android:shadowColor="@android:color/black"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2" />
+
+        <CheckBox
+            android:id="@+id/layerH"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="H Layer"
+            android:checked="true"
+            android:textColor="@android:color/white"
+            android:shadowColor="@android:color/black"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2" />
+
+        <CheckBox
+            android:id="@+id/layerHB"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="HB Layer"
+            android:checked="true"
+            android:textColor="@android:color/white"
+            android:shadowColor="@android:color/black"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2" />
+
+        <CheckBox
+            android:id="@+id/layerB"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="B Layer"
+            android:checked="true"
+            android:textColor="@android:color/white"
+            android:shadowColor="@android:color/black"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2" />
+
+        <CheckBox
+            android:id="@+id/layerB2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="B2 Layer"
+            android:checked="true"
+            android:textColor="@android:color/white"
+            android:shadowColor="@android:color/black"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2" />
+
+        <CheckBox
+            android:id="@+id/layerB4"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="B4 Layer"
+            android:checked="true"
+            android:textColor="@android:color/white"
+            android:shadowColor="@android:color/black"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2" />
+
+        <CheckBox
+            android:id="@+id/layerB6"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="B6 Layer"
+            android:checked="true"
+            android:textColor="@android:color/white"
+            android:shadowColor="@android:color/black"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2" />
+
+        <CheckBox
+            android:id="@+id/layerB8"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="B8 Layer"
+            android:checked="true"
+            android:textColor="@android:color/white"
+            android:shadowColor="@android:color/black"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
