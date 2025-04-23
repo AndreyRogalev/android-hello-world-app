@@ -92,8 +92,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private boolean isPencilMode = false;
     private Bitmap pencilBitmap;
     private Bitmap[] layerBitmaps;
-    private boolean[] layerVisibility = new boolean[8]; // Для H2, H, HB, B, B2, B4, B6, B8
-    private static final String[] PENCIL_HARDNESS = {"H2", "H", "HB", "B", "B2", "B4", "B6", "B8"};
+    private boolean[] layerVisibility = new boolean[20]; // Для 9H, 8H, 7H, 6H, 5H, 4H, 3H, 2H, H, F, HB, B, 2B, 3B, 4B, 5B, 6B, 7B, 8B, 9B
+    private static final String[] PENCIL_HARDNESS = {
+            "9H", "8H", "7H", "6H", "5H", "4H", "3H", "2H", "H", "F",
+            "HB", "B", "2B", "3B", "4B", "5B", "6B", "7B", "8B", "9B"
+    };
 
     // Распознавание жестов
     private ScaleGestureDetector scaleGestureDetector;
@@ -167,14 +170,26 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         // Инициализация CheckBox для слоев в порядке твердости
         layerCheckBoxes = new CheckBox[] {
-                findViewById(R.id.layerH2),    // 0: H2
-                findViewById(R.id.layerH),     // 1: H
-                findViewById(R.id.layerHB),    // 2: HB
-                findViewById(R.id.layerB),     // 3: B
-                findViewById(R.id.layerB2),    // 4: B2
-                findViewById(R.id.layerB4),    // 5: B4
-                findViewById(R.id.layerB6),    // 6: B6
-                findViewById(R.id.layerB8)     // 7: B8
+                findViewById(R.id.layer9H),    // 0: 9H
+                findViewById(R.id.layer8H),    // 1: 8H
+                findViewById(R.id.layer7H),    // 2: 7H
+                findViewById(R.id.layer6H),    // 3: 6H
+                findViewById(R.id.layer5H),    // 4: 5H
+                findViewById(R.id.layer4H),    // 5: 4H
+                findViewById(R.id.layer3H),    // 6: 3H
+                findViewById(R.id.layer2H),    // 7: 2H
+                findViewById(R.id.layerH),     // 8: H
+                findViewById(R.id.layerF),     // 9: F
+                findViewById(R.id.layerHB),    // 10: HB
+                findViewById(R.id.layerB),     // 11: B
+                findViewById(R.id.layer2B),    // 12: 2B
+                findViewById(R.id.layer3B),    // 13: 3B
+                findViewById(R.id.layer4B),    // 14: 4B
+                findViewById(R.id.layer5B),    // 15: 5B
+                findViewById(R.id.layer6B),    // 16: 6B
+                findViewById(R.id.layer7B),    // 17: 7B
+                findViewById(R.id.layer8B),    // 18: 8B
+                findViewById(R.id.layer9B)     // 19: 9B
         };
 
         // Установка слушателей для CheckBox слоев
@@ -390,8 +405,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 int imageWidth = options.outWidth;
                 Log.d(TAG, "LoadImageTask: Original image size: " + imageWidth + "x" + imageHeight);
 
-                int reqWidth = 1920;
-                int reqHeight = 1080;
+                int reqWidth = 1280; // Уменьшено для оптимизации памяти
+                int reqHeight = 720;
                 options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
                 Log.d(TAG, "LoadImageTask: Calculated inSampleSize: " + options.inSampleSize);
 
@@ -566,8 +581,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         paint.setColorFilter(filter);
         canvas.drawBitmap(originalBitmap, 0, 0, paint);
 
-        layerBitmaps = new Bitmap[8]; // Для H2, H, HB, B, B2, B4, B6, B8
-        for (int i = 0; i < 8; i++) {
+        layerBitmaps = new Bitmap[20]; // Для 9H–9B
+        for (int i = 0; i < 20; i++) {
             layerBitmaps[i] = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
             layerBitmaps[i].eraseColor(Color.TRANSPARENT);
         }
@@ -578,7 +593,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         for (int i = 0; i < pixels.length; i++) {
             int gray = Color.red(pixels[i]);
             int layerIndex = getLayerIndex(gray);
-            if (layerIndex >= 0 && layerIndex < 8) {
+            if (layerIndex >= 0 && layerIndex < 20) {
                 layerBitmaps[layerIndex].setPixel(i % originalBitmap.getWidth(), i / originalBitmap.getWidth(), pixels[i]);
             }
         }
@@ -587,14 +602,26 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private int getLayerIndex(int grayValue) {
-        if (grayValue >= 224) return 0; // H2 (включает белый, 224–255)
-        if (grayValue >= 192) return 1; // H
-        if (grayValue >= 160) return 2; // HB
-        if (grayValue >= 128) return 3; // B
-        if (grayValue >= 96) return 4; // B2
-        if (grayValue >= 64) return 5; // B4
-        if (grayValue >= 32) return 6; // B6
-        return 7; // B8 (включает черный, 0–31)
+        if (grayValue >= 243) return 0;  // 9H: 243–255
+        if (grayValue >= 230) return 1;  // 8H: 230–242
+        if (grayValue >= 217) return 2;  // 7H: 217–229
+        if (grayValue >= 204) return 3;  // 6H: 204–216
+        if (grayValue >= 191) return 4;  // 5H: 191–203
+        if (grayValue >= 178) return 5;  // 4H: 178–190
+        if (grayValue >= 166) return 6;  // 3H: 166–177
+        if (grayValue >= 153) return 7;  // 2H: 153–165
+        if (grayValue >= 140) return 8;  // H: 140–152
+        if (grayValue >= 128) return 9;  // F: 128–139
+        if (grayValue >= 115) return 10; // HB: 115–127
+        if (grayValue >= 102) return 11; // B: 102–114
+        if (grayValue >= 89) return 12;  // 2B: 89–101
+        if (grayValue >= 77) return 13;  // 3B: 77–88
+        if (grayValue >= 64) return 14;  // 4B: 64–76
+        if (grayValue >= 51) return 15;  // 5B: 51–63
+        if (grayValue >= 38) return 16;  // 6B: 38–50
+        if (grayValue >= 26) return 17;  // 7B: 26–37
+        if (grayValue >= 13) return 18;  // 8B: 13–25
+        return 19; // 9B: 0–12
     }
 
     private void updateImageDisplay() {
