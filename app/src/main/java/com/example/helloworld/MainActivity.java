@@ -92,7 +92,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private boolean isPencilMode = false;
     private Bitmap pencilBitmap;
     private Bitmap[] layerBitmaps;
-    private boolean[] layerVisibility = new boolean[10]; // Расширено до 10 для Black и White
+    private boolean[] layerVisibility = new boolean[10]; // Для H2, H, HB, B, B2, B4, B6, B8, Black, White
     private static final String[] PENCIL_HARDNESS = {"H2", "H", "HB", "B", "B2", "B4", "B6", "B8", "Black", "White"};
 
     // Распознавание жестов
@@ -165,18 +165,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             updateImageDisplay();
         });
 
-        // Инициализация CheckBox для слоев
+        // Инициализация CheckBox для слоев в порядке твердости
         layerCheckBoxes = new CheckBox[] {
-                findViewById(R.id.layerH2),
-                findViewById(R.id.layerH),
-                findViewById(R.id.layerHB),
-                findViewById(R.id.layerB),
-                findViewById(R.id.layerB2),
-                findViewById(R.id.layerB4),
-                findViewById(R.id.layerB6),
-                findViewById(R.id.layerB8),
-                findViewById(R.id.layerBlack),
-                findViewById(R.id.layerWhite)
+                findViewById(R.id.layerH2),    // 0: H2
+                findViewById(R.id.layerH),     // 1: H
+                findViewById(R.id.layerHB),    // 2: HB
+                findViewById(R.id.layerB),     // 3: B
+                findViewById(R.id.layerB2),    // 4: B2
+                findViewById(R.id.layerB4),    // 5: B4
+                findViewById(R.id.layerB6),    // 6: B6
+                findViewById(R.id.layerB8),    // 7: B8
+                findViewById(R.id.layerBlack), // 8: Black
+                findViewById(R.id.layerWhite)  // 9: White
         };
 
         // Установка слушателей для CheckBox слоев
@@ -568,7 +568,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         paint.setColorFilter(filter);
         canvas.drawBitmap(originalBitmap, 0, 0, paint);
 
-        layerBitmaps = new Bitmap[10]; // Расширено до 10 для Black и White
+        layerBitmaps = new Bitmap[10]; // Для H2, H, HB, B, B2, B4, B6, B8, Black, White
         for (int i = 0; i < 10; i++) {
             layerBitmaps[i] = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
             layerBitmaps[i].eraseColor(Color.TRANSPARENT);

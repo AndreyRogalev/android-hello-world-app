@@ -95,6 +95,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/pencilModeSwitch">
 
+        <!-- H2 (самый твердый) -->
         <CheckBox
             android:id="@+id/layerH2"
             android:layout_width="wrap_content"
@@ -107,6 +108,7 @@
             android:shadowDy="1"
             android:shadowRadius="2" />
 
+        <!-- H -->
         <CheckBox
             android:id="@+id/layerH"
             android:layout_width="wrap_content"
@@ -119,6 +121,7 @@
             android:shadowDy="1"
             android:shadowRadius="2" />
 
+        <!-- HB -->
         <CheckBox
             android:id="@+id/layerHB"
             android:layout_width="wrap_content"
@@ -131,6 +134,7 @@
             android:shadowDy="1"
             android:shadowRadius="2" />
 
+        <!-- B -->
         <CheckBox
             android:id="@+id/layerB"
             android:layout_width="wrap_content"
@@ -143,6 +147,7 @@
             android:shadowDy="1"
             android:shadowRadius="2" />
 
+        <!-- B2 -->
         <CheckBox
             android:id="@+id/layerB2"
             android:layout_width="wrap_content"
@@ -155,6 +160,7 @@
             android:shadowDy="1"
             android:shadowRadius="2" />
 
+        <!-- B4 -->
         <CheckBox
             android:id="@+id/layerB4"
             android:layout_width="wrap_content"
@@ -167,6 +173,7 @@
             android:shadowDy="1"
             android:shadowRadius="2" />
 
+        <!-- B6 -->
         <CheckBox
             android:id="@+id/layerB6"
             android:layout_width="wrap_content"
@@ -179,6 +186,7 @@
             android:shadowDy="1"
             android:shadowRadius="2" />
 
+        <!-- B8 -->
         <CheckBox
             android:id="@+id/layerB8"
             android:layout_width="wrap_content"
@@ -191,6 +199,7 @@
             android:shadowDy="1"
             android:shadowRadius="2" />
 
+        <!-- Black -->
         <CheckBox
             android:id="@+id/layerBlack"
             android:layout_width="wrap_content"
@@ -203,6 +212,7 @@
             android:shadowDy="1"
             android:shadowRadius="2" />
 
+        <!-- White -->
         <CheckBox
             android:id="@+id/layerWhite"
             android:layout_width="wrap_content"
