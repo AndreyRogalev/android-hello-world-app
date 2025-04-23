@@ -86,6 +86,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private Matrix matrix = new Matrix();
     private float scaleFactor = 1.0f;
     private float rotationAngle = 0.0f;
+    private Uri currentImageUri; // Добавлено поле для хранения URI изображения
 
     // Карандашный режим
     private boolean isPencilMode = false;
