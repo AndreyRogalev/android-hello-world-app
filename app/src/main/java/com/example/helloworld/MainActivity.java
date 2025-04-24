@@ -660,7 +660,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
             float previousScaleFactor = scaleFactor;
             scaleFactor *= detector.getScaleFactor();
-            scaleFactor = Math.max(0.1f, Math.min(scaleFactor, 5.0f));
+            scaleFactor = Math.max(0.1f, Math.min(scaleFactor, 10.0f));
 
             float scaleChange = scaleFactor / previousScaleFactor;
             matrix.postScale(scaleChange, scaleChange, detector.getFocusX(), detector.getFocusY());
