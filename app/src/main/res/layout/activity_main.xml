@@ -46,12 +46,12 @@
 
     <!-- CheckBox для управления видимостью изображения -->
     <CheckBox
-        android:id="@+id/imageVisibilityCheckbox"
+        android:id="@+id/hideImageCheckbox"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginEnd="16dp"
-        android:text="@string/show_image"
+        android:text="@string/hide_image"
         android:checked="false"
         android:textColor="@android:color/white"
         android:shadowColor="@android:color/black"

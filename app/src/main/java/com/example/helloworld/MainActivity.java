@@ -77,7 +77,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private CheckBox controlsVisibilityCheckbox;
     private Switch pencilModeSwitch;
     private Button layerSelectButton;
-    private CheckBox imageVisibilityCheckbox;
+    private CheckBox hideImageCheckbox;
 
     // Камера
     private Camera camera;
@@ -144,7 +144,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         controlsVisibilityCheckbox = findViewById(R.id.controlsVisibilityCheckbox);
         pencilModeSwitch = findViewById(R.id.pencilModeSwitch);
         layerSelectButton = findViewById(R.id.layerSelectButton);
-        imageVisibilityCheckbox = findViewById(R.id.imageVisibilityCheckbox);
+        hideImageCheckbox = findViewById(R.id.hideImageCheckbox);
 
         // Настройка ImageView для трансформаций
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
@@ -178,8 +178,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         // Слушатель для кнопки выбора слоев
         layerSelectButton.setOnClickListener(v -> showLayerSelectionDialog());
 
-        // Слушатель для CheckBox видимости изображения (обратная логика)
-        imageVisibilityCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        // Слушатель для CheckBox скрытия изображения (обратная логика)
+        hideImageCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isImageVisible = !isChecked; // Обратная логика: включено = изображение скрыто
             updateImageDisplay();
         });
@@ -243,12 +243,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             // Восстановление состояния видимости изображения (обратная логика)
             boolean isImageVisibleSaved = savedInstanceState.getBoolean(KEY_IMAGE_VISIBLE, true);
             isImageVisible = isImageVisibleSaved;
-            imageVisibilityCheckbox.setChecked(!isImageVisible); // Обратная логика
+            hideImageCheckbox.setChecked(!isImageVisible); // Обратная логика
         } else {
             Log.d(TAG, "No saved state found.");
             restoredControlsVisible = controlsVisibilityCheckbox.isChecked();
             // Устанавливаем начальное состояние: CheckBox выключен, изображение видно
-            imageVisibilityCheckbox.setChecked(false);
+            hideImageCheckbox.setChecked(false);
             isImageVisible = true;
         }
 
@@ -277,7 +277,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private void updateControlsVisibility(boolean show) {
         int visibility = show ? View.VISIBLE : View.GONE;
         String checkboxText = show ? getString(R.string.show_controls) : "";
-        String imageCheckboxText = show ? getString(R.string.show_image) : "";
+        String imageCheckboxText = show ? getString(R.string.hide_image) : "";
 
         if (pickImageButton != null) {
             pickImageButton.setVisibility(visibility);
@@ -294,12 +294,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (controlsVisibilityCheckbox != null) {
             controlsVisibilityCheckbox.setText(checkboxText);
         }
-        if (imageVisibilityCheckbox != null) {
-            imageVisibilityCheckbox.setText(imageCheckboxText);
-            imageVisibilityCheckbox.setVisibility(View.VISIBLE); // Всегда видим
+        if (hideImageCheckbox != null) {
+            hideImageCheckbox.setText(imageCheckboxText);
+            hideImageCheckbox.setVisibility(View.VISIBLE); // Всегда видим
         }
 
         Log.d(TAG, "Controls visibility updated: " + (show ? "VISIBLE" : "GONE"));
+        updateImageDisplay(); // Обновляем отображение изображения
     }
 
     // --- Управление разрешениями ---
@@ -548,6 +549,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         imageView.post(() -> {
             Log.d(TAG, "Applying initial fit matrix. Initial scale: " + initialScale + ", Initial translation: (" + initialTranslateX + ", " + initialTranslateY + ")");
             imageView.setImageMatrix(matrix);
+            imageView.invalidate();
             scaleFactor = 1.0f;
             rotationAngle = 0.0f;
         });
@@ -562,6 +564,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         imageView.post(() -> {
             Log.d(TAG, "Applying matrix to ImageView. Scale: " + scaleFactor + ", Rotation: " + rotationAngle);
             imageView.setImageMatrix(matrix);
+            imageView.invalidate();
         });
     }
 
@@ -569,6 +572,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         int alpha = (int) (((float) progress / 100.0f) * 255);
         if (imageView != null) {
             imageView.setImageAlpha(alpha);
+            imageView.invalidate();
             Log.d(TAG, "Setting ImageView alpha to " + alpha + " (progress: " + progress + ")");
         }
     }
@@ -582,6 +586,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         if (pencilBitmap != null && !pencilBitmap.isRecycled()) {
             pencilBitmap.recycle();
+            pencilBitmap = null;
         }
         if (layerBitmaps != null) {
             for (Bitmap layer : layerBitmaps) {
@@ -589,35 +594,51 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     layer.recycle();
                 }
             }
+            layerBitmaps = null;
         }
 
-        pencilBitmap = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(pencilBitmap);
-        Paint paint = new Paint();
-        ColorMatrix colorMatrix = new ColorMatrix();
-        colorMatrix.setSaturation(0);
-        ColorMatrixColorFilter filter = new ColorMatrixColorFilter(colorMatrix);
-        paint.setColorFilter(filter);
-        canvas.drawBitmap(originalBitmap, 0, 0, paint);
-
-        layerBitmaps = new Bitmap[20]; // Для 9H–9B
-        for (int i = 0; i < 20; i++) {
-            layerBitmaps[i] = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
-            layerBitmaps[i].eraseColor(Color.TRANSPARENT);
-        }
-
-        int[] pixels = new int[originalBitmap.getWidth() * originalBitmap.getHeight()];
-        pencilBitmap.getPixels(pixels, 0, originalBitmap.getWidth(), 0, 0, originalBitmap.getWidth(), originalBitmap.getHeight());
-
-        for (int i = 0; i < pixels.length; i++) {
-            int gray = Color.red(pixels[i]);
-            int layerIndex = getLayerIndex(gray);
-            if (layerIndex >= 0 && layerIndex < 20) {
-                layerBitmaps[layerIndex].setPixel(i % originalBitmap.getWidth(), i / originalBitmap.getWidth(), pixels[i]);
+        try {
+            pencilBitmap = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
+            if (pencilBitmap == null) {
+                Log.e(TAG, "Failed to create pencilBitmap");
+                return;
             }
-        }
+            Canvas canvas = new Canvas(pencilBitmap);
+            Paint paint = new Paint();
+            ColorMatrix colorMatrix = new ColorMatrix();
+            colorMatrix.setSaturation(0);
+            ColorMatrixColorFilter filter = new ColorMatrixColorFilter(colorMatrix);
+            paint.setColorFilter(filter);
+            canvas.drawBitmap(originalBitmap, 0, 0, paint);
 
-        Log.d(TAG, "Pencil effect processed and layers created");
+            layerBitmaps = new Bitmap[20]; // Для 9H–9B
+            for (int i = 0; i < 20; i++) {
+                layerBitmaps[i] = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
+                if (layerBitmaps[i] == null) {
+                    Log.e(TAG, "Failed to create layerBitmap[" + i + "]");
+                    return;
+                }
+                layerBitmaps[i].eraseColor(Color.TRANSPARENT);
+            }
+
+            int[] pixels = new int[originalBitmap.getWidth() * originalBitmap.getHeight()];
+            pencilBitmap.getPixels(pixels, 0, originalBitmap.getWidth(), 0, 0, originalBitmap.getWidth(), originalBitmap.getHeight());
+
+            for (int i = 0; i < pixels.length; i++) {
+                int gray = Color.red(pixels[i]);
+                int layerIndex = getLayerIndex(gray);
+                if (layerIndex >= 0 && layerIndex < 20 && layerBitmaps[layerIndex] != null) {
+                    layerBitmaps[layerIndex].setPixel(i % originalBitmap.getWidth(), i / originalBitmap.getWidth(), pixels[i]);
+                }
+            }
+
+            Log.d(TAG, "Pencil effect processed and layers created");
+        } catch (OutOfMemoryError e) {
+            Log.e(TAG, "OutOfMemoryError in processPencilEffect", e);
+            Toast.makeText(this, "Not enough memory for pencil effect", Toast.LENGTH_SHORT).show();
+            pencilBitmap = null;
+            layerBitmaps = null;
+        }
     }
 
     private int getLayerIndex(int grayValue) {
@@ -645,35 +666,73 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     private void updateImageDisplay() {
         if (originalBitmap == null || !isImageVisible) {
+            imageView.setImageBitmap(null);
             imageView.setVisibility(View.INVISIBLE);
+            imageView.invalidate();
+            Log.d(TAG, "Image display cleared: originalBitmap=" + (originalBitmap == null ? "null" : "not null") + ", isImageVisible=" + isImageVisible);
             return;
         }
 
+        boolean resetTransformations = false;
         if (isPencilMode) {
             if (pencilBitmap == null || layerBitmaps == null) {
                 processPencilEffect();
+                resetTransformations = true; // Сбрасываем трансформации при новом pencilBitmap
+            }
+
+            if (pencilBitmap == null || layerBitmaps == null) {
+                Log.e(TAG, "Failed to process pencil effect, cannot display image");
+                imageView.setImageBitmap(null);
+                imageView.setVisibility(View.INVISIBLE);
+                imageView.invalidate();
+                return;
             }
 
             Bitmap resultBitmap = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
+            if (resultBitmap == null) {
+                Log.e(TAG, "Failed to create resultBitmap for pencil mode");
+                imageView.setImageBitmap(null);
+                imageView.setVisibility(View.INVISIBLE);
+                imageView.invalidate();
+                return;
+            }
             Canvas canvas = new Canvas(resultBitmap);
             canvas.drawColor(Color.TRANSPARENT);
 
             for (int i = 0; i < layerBitmaps.length; i++) {
-                if (layerVisibility[i] && layerBitmaps[i] != null) {
+                if (layerVisibility[i] && layerBitmaps[i] != null && !layerBitmaps[i].isRecycled()) {
                     canvas.drawBitmap(layerBitmaps[i], 0, 0, null);
                 }
             }
 
             imageView.setImageBitmap(resultBitmap);
             setImageAlpha(transparencySeekBar.getProgress());
-            imageView.post(() -> imageView.setImageMatrix(matrix));
+            imageView.setVisibility(View.VISIBLE);
+            if (resetTransformations) {
+                resetTransformationsAndFit();
+            } else {
+                imageView.post(() -> {
+                    imageView.setImageMatrix(matrix);
+                    imageView.invalidate();
+                });
+            }
         } else {
+            if (pencilBitmap != null || layerBitmaps != null) {
+                resetTransformations = true; // Сбрасываем трансформации при возврате к originalBitmap
+            }
             imageView.setImageBitmap(originalBitmap);
             setImageAlpha(transparencySeekBar.getProgress());
-            imageView.post(() -> imageView.setImageMatrix(matrix));
+            imageView.setVisibility(View.VISIBLE);
+            if (resetTransformations) {
+                resetTransformationsAndFit();
+            } else {
+                imageView.post(() -> {
+                    imageView.setImageMatrix(matrix);
+                    imageView.invalidate();
+                });
+            }
         }
 
-        imageView.setVisibility(View.VISIBLE);
         Log.d(TAG, "Image display updated. Pencil mode: " + isPencilMode + ", Image visible: " + isImageVisible);
     }
 
@@ -1103,6 +1162,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             Log.d(TAG, "Resuming: Image URI exists but bitmap is null, reloading image.");
             loadImage(currentImageUri, true);
         }
+        updateImageDisplay(); // Обновляем отображение при возобновлении
     }
 
     @Override
