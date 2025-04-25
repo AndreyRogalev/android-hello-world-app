@@ -77,7 +77,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private CheckBox controlsVisibilityCheckbox;
     private Switch pencilModeSwitch;
     private Button layerSelectButton;
-    private Switch imageVisibilitySwitch;
+    private CheckBox imageVisibilityCheckbox;
 
     // Камера
     private Camera camera;
@@ -144,7 +144,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         controlsVisibilityCheckbox = findViewById(R.id.controlsVisibilityCheckbox);
         pencilModeSwitch = findViewById(R.id.pencilModeSwitch);
         layerSelectButton = findViewById(R.id.layerSelectButton);
-        imageVisibilitySwitch = findViewById(R.id.imageVisibilitySwitch);
+        imageVisibilityCheckbox = findViewById(R.id.imageVisibilityCheckbox);
 
         // Настройка ImageView для трансформаций
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
@@ -178,9 +178,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         // Слушатель для кнопки выбора слоев
         layerSelectButton.setOnClickListener(v -> showLayerSelectionDialog());
 
-        // Слушатель для Switch видимости изображения
-        imageVisibilitySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            isImageVisible = isChecked;
+        // Слушатель для CheckBox видимости изображения (обратная логика)
+        imageVisibilityCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isImageVisible = !isChecked; // Обратная логика: включено = изображение скрыто
             updateImageDisplay();
         });
 
@@ -240,12 +240,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             pencilModeSwitch.setChecked(isPencilMode);
             layerSelectButton.setVisibility(isPencilMode ? View.VISIBLE : View.GONE);
 
-            // Восстановление состояния видимости изображения
-            isImageVisible = savedInstanceState.getBoolean(KEY_IMAGE_VISIBLE, true);
-            imageVisibilitySwitch.setChecked(isImageVisible);
+            // Восстановление состояния видимости изображения (обратная логика)
+            boolean isImageVisibleSaved = savedInstanceState.getBoolean(KEY_IMAGE_VISIBLE, true);
+            isImageVisible = isImageVisibleSaved;
+            imageVisibilityCheckbox.setChecked(!isImageVisible); // Обратная логика
         } else {
             Log.d(TAG, "No saved state found.");
             restoredControlsVisible = controlsVisibilityCheckbox.isChecked();
+            // Устанавливаем начальное состояние: CheckBox выключен, изображение видно
+            imageVisibilityCheckbox.setChecked(false);
+            isImageVisible = true;
         }
 
         updateControlsVisibility(restoredControlsVisible);
@@ -273,6 +277,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private void updateControlsVisibility(boolean show) {
         int visibility = show ? View.VISIBLE : View.GONE;
         String checkboxText = show ? getString(R.string.show_controls) : "";
+        String imageCheckboxText = show ? getString(R.string.show_image) : "";
 
         if (pickImageButton != null) {
             pickImageButton.setVisibility(visibility);
@@ -289,9 +294,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (controlsVisibilityCheckbox != null) {
             controlsVisibilityCheckbox.setText(checkboxText);
         }
-        // imageVisibilitySwitch всегда видим
-        if (imageVisibilitySwitch != null) {
-            imageVisibilitySwitch.setVisibility(View.VISIBLE);
+        if (imageVisibilityCheckbox != null) {
+            imageVisibilityCheckbox.setText(imageCheckboxText);
+            imageVisibilityCheckbox.setVisibility(View.VISIBLE); // Всегда видим
         }
 
         Log.d(TAG, "Controls visibility updated: " + (show ? "VISIBLE" : "GONE"));
