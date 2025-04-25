@@ -66,6 +66,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private static final String KEY_ROTATION_ANGLE = "rotationAngle";
     private static final String KEY_MATRIX_VALUES = "matrixValues";
     private static final String KEY_CONTROLS_VISIBLE = "controlsVisible";
+    private static final String KEY_IMAGE_VISIBLE = "imageVisible";
 
     // UI Элементы
     private ImageView imageView;
@@ -76,6 +77,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private CheckBox controlsVisibilityCheckbox;
     private Switch pencilModeSwitch;
     private Button layerSelectButton;
+    private Switch imageVisibilitySwitch;
 
     // Камера
     private Camera camera;
@@ -93,11 +95,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private boolean isPencilMode = false;
     private Bitmap pencilBitmap;
     private Bitmap[] layerBitmaps;
-    private boolean[] layerVisibility = new boolean[20]; // Для 9H, 8H, 7H, 6H, 5H, 4H, 3H, 2H, H, F, HB, B, 2B, 3B, 4B, 5B, 6B, 7B, 8B, 9B
+    private boolean[] layerVisibility = new boolean[20]; // Для 9H, 8H, ..., 9B
     private static final String[] PENCIL_HARDNESS = {
             "9H", "8H", "7H", "6H", "5H", "4H", "3H", "2H", "H", "F",
             "HB", "B", "2B", "3B", "4B", "5B", "6B", "7B", "8B", "9B"
     };
+
+    // Управление видимостью изображения
+    private boolean isImageVisible = true;
 
     // Распознавание жестов
     private ScaleGestureDetector scaleGestureDetector;
@@ -139,6 +144,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         controlsVisibilityCheckbox = findViewById(R.id.controlsVisibilityCheckbox);
         pencilModeSwitch = findViewById(R.id.pencilModeSwitch);
         layerSelectButton = findViewById(R.id.layerSelectButton);
+        imageVisibilitySwitch = findViewById(R.id.imageVisibilitySwitch);
 
         // Настройка ImageView для трансформаций
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
@@ -171,6 +177,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         // Слушатель для кнопки выбора слоев
         layerSelectButton.setOnClickListener(v -> showLayerSelectionDialog());
+
+        // Слушатель для Switch видимости изображения
+        imageVisibilitySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isImageVisible = isChecked;
+            updateImageDisplay();
+        });
 
         // Инициализация layerVisibility
         for (int i = 0; i < layerVisibility.length; i++) {
@@ -227,6 +239,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             }
             pencilModeSwitch.setChecked(isPencilMode);
             layerSelectButton.setVisibility(isPencilMode ? View.VISIBLE : View.GONE);
+
+            // Восстановление состояния видимости изображения
+            isImageVisible = savedInstanceState.getBoolean(KEY_IMAGE_VISIBLE, true);
+            imageVisibilitySwitch.setChecked(isImageVisible);
         } else {
             Log.d(TAG, "No saved state found.");
             restoredControlsVisible = controlsVisibilityCheckbox.isChecked();
@@ -272,6 +288,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
         if (controlsVisibilityCheckbox != null) {
             controlsVisibilityCheckbox.setText(checkboxText);
+        }
+        // imageVisibilitySwitch всегда видим
+        if (imageVisibilitySwitch != null) {
+            imageVisibilitySwitch.setVisibility(View.VISIBLE);
         }
 
         Log.d(TAG, "Controls visibility updated: " + (show ? "VISIBLE" : "GONE"));
@@ -619,7 +639,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void updateImageDisplay() {
-        if (originalBitmap == null) {
+        if (originalBitmap == null || !isImageVisible) {
             imageView.setVisibility(View.INVISIBLE);
             return;
         }
@@ -649,7 +669,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
 
         imageView.setVisibility(View.VISIBLE);
-        Log.d(TAG, "Image display updated. Pencil mode: " + isPencilMode);
+        Log.d(TAG, "Image display updated. Pencil mode: " + isPencilMode + ", Image visible: " + isImageVisible);
     }
 
     // --- Обработка жестов ---
@@ -660,7 +680,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
             float previousScaleFactor = scaleFactor;
             scaleFactor *= detector.getScaleFactor();
-            scaleFactor = Math.max(0.1f, Math.min(scaleFactor, 10.0f));
+            scaleFactor = Math.max(0.1f, Math.min(scaleFactor, 5.0f));
 
             float scaleChange = scaleFactor / previousScaleFactor;
             matrix.postScale(scaleChange, scaleChange, detector.getFocusX(), detector.getFocusY());
@@ -1143,6 +1163,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         outState.putBoolean("isPencilMode", isPencilMode);
         outState.putBooleanArray("layerVisibility", layerVisibility);
+        outState.putBoolean(KEY_IMAGE_VISIBLE, isImageVisible);
     }
 
     public void switchCamera() {
