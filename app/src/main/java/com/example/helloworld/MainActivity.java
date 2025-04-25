@@ -488,6 +488,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             } else {
                 Log.e(TAG, "LoadImageTask: Failed to load bitmap.");
                 Toast.makeText(activity, "Failed to load image", Toast.LENGTH_SHORT).show();
+                activity.imageView.setImageBitmap(null);
                 activity.imageView.setVisibility(View.INVISIBLE);
                 activity.originalBitmap = null;
                 activity.pencilBitmap = null;
@@ -673,11 +674,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             return;
         }
 
-        boolean resetTransformations = false;
         if (isPencilMode) {
             if (pencilBitmap == null || layerBitmaps == null) {
                 processPencilEffect();
-                resetTransformations = true; // Сбрасываем трансформации при новом pencilBitmap
             }
 
             if (pencilBitmap == null || layerBitmaps == null) {
@@ -708,29 +707,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             imageView.setImageBitmap(resultBitmap);
             setImageAlpha(transparencySeekBar.getProgress());
             imageView.setVisibility(View.VISIBLE);
-            if (resetTransformations) {
-                resetTransformationsAndFit();
-            } else {
-                imageView.post(() -> {
-                    imageView.setImageMatrix(matrix);
-                    imageView.invalidate();
-                });
-            }
+            imageView.post(() -> {
+                imageView.setImageMatrix(matrix);
+                imageView.invalidate();
+            });
         } else {
-            if (pencilBitmap != null || layerBitmaps != null) {
-                resetTransformations = true; // Сбрасываем трансформации при возврате к originalBitmap
-            }
             imageView.setImageBitmap(originalBitmap);
             setImageAlpha(transparencySeekBar.getProgress());
             imageView.setVisibility(View.VISIBLE);
-            if (resetTransformations) {
-                resetTransformationsAndFit();
-            } else {
-                imageView.post(() -> {
-                    imageView.setImageMatrix(matrix);
-                    imageView.invalidate();
-                });
-            }
+            imageView.post(() -> {
+                imageView.setImageMatrix(matrix);
+                imageView.invalidate();
+            });
         }
 
         Log.d(TAG, "Image display updated. Pencil mode: " + isPencilMode + ", Image visible: " + isImageVisible);
