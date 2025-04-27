@@ -53,6 +53,8 @@ import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.util.List;
 
+import android.graphics.PixelFormat;
+
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback, LayerAdapter.OnLayerVisibilityChangedListener {
 
     private static final String TAG = "MainActivity";
@@ -1143,7 +1145,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             }
         } else if (camera != null && !isPreviewRunning && cameraSurfaceHolder != null && cameraSurfaceHolder.getSurface() != null && cameraSurfaceHolder.getSurface().isValid()) {
             Log.d(TAG, "Resuming: Camera exists but preview not running, attempting restart via surfaceChanged logic.");
-            surfaceChanged(cameraSurfaceHolder, 0, cameraSurfaceView.getWidth(), cameraSurfaceView.getHeight());
+            surfaceChanged(cameraSurfaceHolder, PixelFormat.RGBA_8888, cameraSurfaceView.getWidth(), cameraSurfaceView.getHeight());
         }
 
         if (currentImageUri != null && originalBitmap == null) {
@@ -1246,7 +1248,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             startCamera();
             if (camera != null) {
                 Log.d(TAG, "Manually calling surfaceChanged after camera switch.");
-                surfaceChanged(cameraSurfaceHolder, 0, cameraSurfaceView.getWidth(), cameraSurfaceView.getHeight());
+                surfaceChanged(cameraSurfaceHolder, PixelFormat.RGBA_8888, cameraSurfaceView.getWidth(), cameraSurfaceView.getHeight());
             }
         } else {
             Log.w(TAG, "Surface not ready after camera switch, camera will start later via surfaceCreated/Changed.");
