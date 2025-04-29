@@ -1014,7 +1014,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 }
 
                 @Override
-                void onError(@NonNull CameraDevice camera, int error) {
+                public void onError(@NonNull CameraDevice camera, int error) {
                     camera.close();
                     cameraDevice = null;
                     Toast.makeText(MainActivity.this, "Camera error: " + error, Toast.LENGTH_SHORT).show();
