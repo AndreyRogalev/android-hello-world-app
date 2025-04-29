@@ -62,6 +62,16 @@
         app:layout_constraintTop_toTopOf="@id/controlsVisibilityCheckbox"
         app:layout_constraintBottom_toBottomOf="@id/controlsVisibilityCheckbox" />
 
+    <!-- Кнопка для переключения камеры -->
+    <Button
+        android:id="@+id/switchCameraButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="@string/switch_camera"
+        app:layout_constraintEnd_toStartOf="@id/pickImageButton"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <!-- Кнопка выбора изображения -->
     <Button
         android:id="@+id/pickImageButton"
@@ -71,6 +81,26 @@
         android:text="@string/pick_image"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Кнопка сохранения параметров -->
+    <Button
+        android:id="@+id/saveParametersButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="@string/save_parameters"
+        app:layout_constraintEnd_toStartOf="@id/loadParametersButton"
+        app:layout_constraintTop_toBottomOf="@id/pickImageButton" />
+
+    <!-- Кнопка загрузки параметров -->
+    <Button
+        android:id="@+id/loadParametersButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="@string/load_parameters"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/pickImageButton" />
 
     <!-- SeekBar для прозрачности -->
     <SeekBar

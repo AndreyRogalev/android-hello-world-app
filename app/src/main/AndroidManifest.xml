@@ -4,11 +4,14 @@
 
     <!-- Разрешение на использование камеры -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Заявляем, что приложение использует камеру -->
-    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <!-- Заявляем, что приложение использует Camera2 -->
+    <uses-feature android:name="android.hardware.camera2" android:required="true" />
 
     <!-- Разрешение на чтение из внешнего хранилища (для старых версий Android) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <!-- Разрешение на запись во внешнее хранилище (для сохранения параметров.. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <!-- Разрешение на чтение изображений (для Android 13+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -22,12 +25,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-        tools:targetApi="31">
+        tools:targetApi="34">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:screenOrientation="portrait"
             tools:ignore="LockedOrientationActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
