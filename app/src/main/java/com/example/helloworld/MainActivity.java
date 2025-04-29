@@ -24,7 +24,6 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -57,7 +56,6 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -69,7 +67,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private static final String TAG = "MainActivity";
     private static final int CAMERA_PERMISSION_CODE = 100;
     private static final int STORAGE_PERMISSION_CODE = 101;
-    private static final int WRITE_STORAGE_PERMISSION_CODE = 102; // НОВОЕ: код разрешения на запись
+    private static final int WRITE_STORAGE_PERMISSION_CODE = 102;
 
     // Ключи для сохранения состояния
     private static final String KEY_IMAGE_URI = "imageUri";
@@ -91,8 +89,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private Switch pencilModeSwitch;
     private Button layerSelectButton;
     private CheckBox hideImageCheckbox;
-    private Button saveParametersButton; // НОВОЕ: кнопка сохранения параметров
-    private Button loadParametersButton; // НОВОЕ: кнопка загрузки параметров
+    private Button saveParametersButton;
+    private Button loadParametersButton;
 
     // Camera2 API
     private CameraManager cameraManager;
@@ -102,6 +100,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private String currentCameraId;
     private List<String> cameraNames;
     private ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
+    private ExecutorService imageLoadExecutor = Executors.newSingleThreadExecutor();
 
     // Манипуляции с изображением
     private Bitmap originalBitmap = null;
@@ -141,10 +140,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private PointF midPoint = new PointF();
     private float initialAngle = 0f;
 
-    // Activity Result API для выбора изображения
+    // Activity Result API
     private ActivityResultLauncher<Intent> imagePickerLauncher;
-    private ActivityResultLauncher<Intent> saveFileLauncher; // НОВОЕ: лаунчер для сохранения файла
-    private ActivityResultLauncher<Intent> loadFileLauncher; // НОВОЕ: лаунчер для загрузки файла
+    private ActivityResultLauncher<Intent> saveFileLauncher;
+    private ActivityResultLauncher<Intent> loadFileLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -169,13 +168,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         pencilModeSwitch = findViewById(R.id.pencilModeSwitch);
         layerSelectButton = findViewById(R.id.layerSelectButton);
         hideImageCheckbox = findViewById(R.id.hideImageCheckbox);
-        saveParametersButton = findViewById(R.id.saveParametersButton); // НОВОЕ
-        loadParametersButton = findViewById(R.id.loadParametersButton); // НОВОЕ
+        saveParametersButton = findViewById(R.id.saveParametersButton);
+        loadParametersButton = findViewById(R.id.loadParametersButton);
 
         // Настройка ImageView для трансформаций
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
 
-        // Инициализация Activity Result Launcher для выбора изображения
+        // Инициализация Activity Result Launcher
         imagePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -192,7 +191,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 }
         );
 
-        // НОВОЕ: Инициализация лаунчеров для сохранения и загрузки параметров
         saveFileLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -219,9 +217,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         // Настройка слушателей
         pickImageButton.setOnClickListener(v -> checkPermissionAndPickImage());
-
         switchCameraButton.setOnClickListener(v -> switchCamera());
-
         transparencySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -232,25 +228,17 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
-
-        controlsVisibilityCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            updateControlsVisibility(isChecked);
-        });
-
+        controlsVisibilityCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> updateControlsVisibility(isChecked));
         pencilModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isPencilMode = isChecked;
             layerSelectButton.setVisibility(isChecked ? View.VISIBLE : View.GONE);
             updateImageDisplay();
         });
-
         layerSelectButton.setOnClickListener(v -> showLayerSelectionDialog());
-
         hideImageCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isImageVisible = !isChecked;
             updateImageDisplay();
         });
-
-        // НОВОЕ: Слушатели для новых кнопок
         saveParametersButton.setOnClickListener(v -> checkPermissionAndSaveParameters());
         loadParametersButton.setOnClickListener(v -> checkPermissionAndLoadParameters());
 
@@ -326,7 +314,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         updateControlsVisibility(restoredControlsVisible);
     }
 
-    // НОВОЕ: Проверка разрешений для сохранения параметров
     private void checkPermissionAndSaveParameters() {
         String permission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ?
                 Manifest.permission.READ_MEDIA_IMAGES : Manifest.permission.WRITE_EXTERNAL_STORAGE;
@@ -338,7 +325,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    // НОВОЕ: Проверка разрешений для загрузки параметров
     private void checkPermissionAndLoadParameters() {
         String permission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ?
                 Manifest.permission.READ_MEDIA_IMAGES : Manifest.permission.READ_EXTERNAL_STORAGE;
@@ -350,7 +336,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    // НОВОЕ: Открытие диалога для сохранения файла
     private void openSaveFilePicker() {
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -364,7 +349,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    // НОВОЕ: Открытие диалога для загрузки файла
     private void openLoadFilePicker() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -377,7 +361,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    // НОВОЕ: Сохранение параметров в JSON-файл
     private void saveParametersToFile(Uri uri) {
         if (originalBitmap == null) {
             Toast.makeText(this, "Нет изображения для сохранения параметров", Toast.LENGTH_SHORT).show();
@@ -417,7 +400,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    // НОВОЕ: Загрузка параметров из JSON-файла
     private void loadParametersFromFile(Uri uri) {
         if (originalBitmap == null) {
             Toast.makeText(this, "Сначала загрузите изображение", Toast.LENGTH_SHORT).show();
@@ -454,7 +436,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                         layerVisibility[i] = visibilityArray.getBoolean(i);
                     }
 
-                    // Применение параметров
                     pencilModeSwitch.setChecked(isPencilMode);
                     hideImageCheckbox.setChecked(!isImageVisible);
                     layerSelectButton.setVisibility(isPencilMode ? View.VISIBLE : View.GONE);
@@ -496,12 +477,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         } else if (requestCode == STORAGE_PERMISSION_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Storage Permission Granted", Toast.LENGTH_SHORT).show();
-                openLoadFilePicker(); // ИЗМЕНЕНО: открываем диалог загрузки
+                openLoadFilePicker();
             } else {
                 Toast.makeText(this, "Storage Permission Denied", Toast.LENGTH_SHORT).show();
                 Log.e(TAG, "Storage permission denied.");
             }
-        } else if (requestCode == WRITE_STORAGE_PERMISSION_CODE) { // НОВОЕ: обработка разрешения на запись
+        } else if (requestCode == WRITE_STORAGE_PERMISSION_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Write Permission Granted", Toast.LENGTH_SHORT).show();
                 openSaveFilePicker();
@@ -569,8 +550,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         transparencySeekBar.setVisibility(visibility);
         pencilModeSwitch.setVisibility(visibility);
         layerSelectButton.setVisibility(show && isPencilMode ? View.VISIBLE : View.GONE);
-        saveParametersButton.setVisibility(visibility); // НОВОЕ
-        loadParametersButton.setVisibility(visibility); // НОВОЕ
+        saveParametersButton.setVisibility(visibility);
+        loadParametersButton.setVisibility(visibility);
         controlsVisibilityCheckbox.setText(checkboxText);
         hideImageCheckbox.setText(imageCheckboxText);
         hideImageCheckbox.setVisibility(View.VISIBLE);
@@ -605,27 +586,32 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void loadImage(Uri uri, boolean isRestoring) {
-        if (uri != null) {
-            new LoadImageTask(this, isRestoring).execute(uri);
-        } else {
+        if (uri == null) {
             Log.e(TAG, "Cannot load image, URI is null.");
+            return;
         }
+        new LoadImageTask(this, isRestoring).execute(uri);
     }
 
-    private static class LoadImageTask extends AsyncTask<Uri, Void, Bitmap> {
-        private final WeakReference<MainActivity> activityReference;
+    private class LoadImageTask {
+        private final MainActivity activity;
         private final Uri imageUri;
-        private final boolean isRestoringState;
+        private final boolean isRestoring;
 
-        LoadImageTask(MainActivity context, boolean isRestoring) {
-            activityReference = new WeakReference<>(context);
-            imageUri = context.currentImageUri;
-            isRestoringState = isRestoring;
+        LoadImageTask(MainActivity activity, boolean isRestoring) {
+            this.activity = activity;
+            this.imageUri = activity.currentImageUri;
+            this.isRestoring = isRestoring;
         }
 
-        @Override
-        protected Bitmap doInBackground(Uri... uris) {
-            MainActivity activity = activityReference.get();
+        void execute(Uri uri) {
+            imageLoadExecutor.submit(() -> {
+                Bitmap bitmap = loadBitmap();
+                runOnUiThread(() -> postExecute(bitmap));
+            });
+        }
+
+        private Bitmap loadBitmap() {
             if (activity == null || activity.isFinishing() || imageUri == null) return null;
             Log.d(TAG, "LoadImageTask: Starting background load for " + imageUri);
 
@@ -658,9 +644,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             }
         }
 
-        @Override
-        protected void onPostExecute(Bitmap bitmap) {
-            MainActivity activity = activityReference.get();
+        private void postExecute(Bitmap bitmap) {
             if (activity == null || activity.isFinishing()) {
                 if (bitmap != null && !bitmap.isRecycled()) {
                     bitmap.recycle();
@@ -677,7 +661,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 activity.layerBitmaps = null;
                 activity.updateImageDisplay();
 
-                if (isRestoringState) {
+                if (isRestoring) {
                     activity.imageView.post(() -> activity.imageView.setImageMatrix(activity.matrix));
                 } else {
                     activity.resetTransformationsAndFit();
@@ -730,7 +714,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         float scaleX = viewWidth / bmpWidth;
         float scaleY = viewHeight / bmpHeight;
-        float initialScale = Math_SCREEN_WIDTH / bmpWidth;
+        float initialScale = viewWidth / bmpWidth;
 
         float scaledBmpWidth = bmpWidth * initialScale;
         float scaledBmpHeight = bmpHeight * initialScale;
@@ -1030,7 +1014,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 }
 
                 @Override
-                public void onError(@NonNull CameraDevice camera, int error) {
+                void onError(@NonNull CameraDevice camera, int error) {
                     camera.close();
                     cameraDevice = null;
                     Toast.makeText(MainActivity.this, "Camera error: " + error, Toast.LENGTH_SHORT).show();
@@ -1152,6 +1136,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         Log.d(TAG, "onDestroy");
         closeCamera();
         cameraExecutor.shutdown();
+        imageLoadExecutor.shutdown();
         if (originalBitmap != null && !originalBitmap.isRecycled()) {
             originalBitmap.recycle();
             originalBitmap = null;
