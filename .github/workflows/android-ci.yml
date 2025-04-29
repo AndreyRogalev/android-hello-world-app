@@ -1,0 +1,76 @@
+# Название вашего workflow (отображается на GitHub во вкладке Actions)
+name: Android CI Build
+
+# Триггеры: когда запускать этот workflow
+on:
+  # Запускать при push в ветку main (или master, если у вас так)
+  push:
+    branches: [ "main", "master" ]
+  # Можно добавить pull_request, если нужно собирать при запросах на слияние
+  # pull_request:
+  #   branches: [ "main", "master" ]
+
+  # Позволяет запускать вручную из интерфейса GitHub Actions
+  workflow_dispatch:
+
+# Задания (jobs), которые будут выполняться
+jobs:
+  # Имя задания (может быть любым)
+  build:
+    # Указываем, на какой виртуальной машине запускать (x86-64!)
+    runs-on: ubuntu-latest
+
+    # Шаги (steps), которые нужно выполнить последовательно
+    steps:
+      # 1. Скачивание вашего кода из репозитория
+      - name: Checkout code
+        uses: actions/checkout@v4 # Используем готовое действие (action)
+
+      # 2. Настройка Java Development Kit (JDK)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17' # Указываем нужную версию JDK
+          distribution: 'temurin' # Популярный дистрибутив OpenJDK (Adoptium)
+          cache: gradle # Включаем кэширование Gradle для ускорения следующих сборок
+
+      # 3. Настройка Android SDK Command-line Tools
+      #    Используем стандартный подход с sdkmanager
+      #    Важно: Мы используем свежие версии, т.к. на x86-64 aapt2 будет работать!
+      - name: Setup Android SDK
+        run: |
+          # Создаем директорию для SDK (путь может быть любым внутри окружения Actions)
+          mkdir -p $HOME/android-sdk
+          export ANDROID_HOME=$HOME/android-sdk
+          # Скачиваем Command-line tools (возьмем относительно свежую версию для примера)
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+          unzip cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
+          # Переименовываем в 'latest' для удобства пути
+          mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+          # Добавляем инструменты в PATH
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          # Принимаем лицензии автоматически
+          yes | sdkmanager --licenses
+          # Устанавливаем нужную платформу и Build Tools
+          # (Берем версии из вашего ПОСЛЕДНЕГО рабочего варианта build.gradle ДО понижения
+          # или просто последние стабильные, т.к. здесь они заработают)
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" # Используем новые версии!
+        shell: bash # Указываем, что команды нужно выполнять в bash
+
+      # 4. Предоставление прав на выполнение скрипту Gradle Wrapper
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+        shell: bash
+
+      # 5. Запуск сборки Debug APK с помощью Gradle Wrapper
+      - name: Build with Gradle
+        run: ./gradlew assembleDebug
+        shell: bash
+
+      # 6. Загрузка собранного APK как артефакта
+      #    Артефакт можно будет скачать со страницы сборки на GitHub
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk # Имя артефакта
+          path: app/build/outputs/apk/debug/app-debug.apk # Путь к файлу APK
