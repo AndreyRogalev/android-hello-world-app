@@ -3,13 +3,14 @@ package com.example.helloworld;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.CheckBox;
+import android.widget.CheckedTextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 public class LayerAdapter extends RecyclerView.Adapter<LayerAdapter.ViewHolder> {
-    private final String[] hardnessLevels;
+
+    private final String[] layers;
     private final boolean[] visibility;
     private final OnLayerVisibilityChangedListener listener;
 
@@ -17,8 +18,8 @@ public class LayerAdapter extends RecyclerView.Adapter<LayerAdapter.ViewHolder> 
         void onLayerVisibilityChanged(int position, boolean isVisible);
     }
 
-    public LayerAdapter(String[] hardnessLevels, boolean[] visibility, OnLayerVisibilityChangedListener listener) {
-        this.hardnessLevels = hardnessLevels;
+    public LayerAdapter(String[] layers, boolean[] visibility, OnLayerVisibilityChangedListener listener) {
+        this.layers = layers;
         this.visibility = visibility;
         this.listener = listener;
     }
@@ -33,25 +34,28 @@ public class LayerAdapter extends RecyclerView.Adapter<LayerAdapter.ViewHolder> 
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        holder.checkBox.setText(hardnessLevels[position]);
-        holder.checkBox.setChecked(visibility[position]);
-        holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            visibility[position] = isChecked;
-            listener.onLayerVisibilityChanged(position, isChecked);
+        holder.checkedTextView.setText(layers[position]);
+        holder.checkedTextView.setChecked(visibility[position]);
+        holder.checkedTextView.setOnClickListener(v -> {
+            visibility[position] = !visibility[position];
+            holder.checkedTextView.setChecked(visibility[position]);
+            if (listener != null) {
+                listener.onLayerVisibilityChanged(position, visibility[position]);
+            }
         });
     }
 
     @Override
     public int getItemCount() {
-        return hardnessLevels.length;
+        return layers.length;
     }
 
-    static class ViewHolder extends RecyclerView.ViewHolder {
-        CheckBox checkBox;
+    public static class ViewHolder extends RecyclerView.ViewHolder {
+        final CheckedTextView checkedTextView;
 
-        ViewHolder(View itemView) {
+        public ViewHolder(@NonNull View itemView) {
             super(itemView);
-            checkBox = itemView.findViewById(android.R.id.text1);
+            checkedTextView = itemView.findViewById(android.R.id.text1);
         }
     }
 }
