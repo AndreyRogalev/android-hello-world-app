@@ -1,146 +1,82 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".MainActivity">
+    android:layout_height="match_parent">
 
-    <!-- SurfaceView для превью камеры (в фоне) -->
     <SurfaceView
         android:id="@+id/cameraSurfaceView"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
-    <!-- ImageView для загруженного изображения (поверх SurfaceView) -->
     <ImageView
         android:id="@+id/imageView"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="invisible"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:contentDescription="@string/loaded_image_description" />
 
-    <!-- CheckBox для управления видимостью контролов -->
-    <CheckBox
-        android:id="@+id/controlsVisibilityCheckbox"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:text="@string/show_controls"
-        android:checked="true"
-        android:textColor="@android:color/white"
-        android:shadowColor="@android:color/black"
-        android:shadowDx="1"
-        android:shadowDy="1"
-        android:shadowRadius="2"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <!-- CheckBox для управления видимостью изображения -->
-    <CheckBox
-        android:id="@+id/hideImageCheckbox"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="16dp"
-        android:text="@string/hide_image"
-        android:checked="false"
-        android:textColor="@android:color/white"
-        android:shadowColor="@android:color/black"
-        android:shadowDx="1"
-        android:shadowDy="1"
-        android:shadowRadius="2"
-        app:layout_constraintStart_toEndOf="@id/controlsVisibilityCheckbox"
-        app:layout_constraintTop_toTopOf="@id/controlsVisibilityCheckbox"
-        app:layout_constraintBottom_toBottomOf="@id/controlsVisibilityCheckbox" />
-
-    <!-- Кнопка для переключения камеры -->
-    <Button
-        android:id="@+id/switchCameraButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:text="@string/switch_camera"
-        app:layout_constraintEnd_toStartOf="@id/pickImageButton"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <!-- Кнопка выбора изображения -->
     <Button
         android:id="@+id/pickImageButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:text="@string/pick_image"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true"
+        android:text="@string/pick_image" />
 
-    <!-- Кнопка сохранения параметров -->
-    <Button
-        android:id="@+id/saveParametersButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:text="@string/save_parameters"
-        app:layout_constraintEnd_toStartOf="@id/loadParametersButton"
-        app:layout_constraintTop_toBottomOf="@id/pickImageButton" />
-
-    <!-- Кнопка загрузки параметров -->
-    <Button
-        android:id="@+id/loadParametersButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:text="@string/load_parameters"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/pickImageButton" />
-
-    <!-- SeekBar для прозрачности -->
     <SeekBar
         android:id="@+id/transparencySeekBar"
-        android:layout_width="0dp"
+        android:layout_width="200dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="80dp"
-        android:max="100"
-        android:progress="100"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        android:layout_below="@id/pickImageButton"
+        android:layout_alignParentStart="true"
+        android:max="100" />
 
-    <!-- Switch для включения/выключения карандашного режима -->
+    <CheckBox
+        android:id="@+id/controlsVisibilityCheckbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/transparencySeekBar"
+        android:layout_alignParentStart="true"
+        android:text="@string/show_controls" />
+
     <Switch
         android:id="@+id/pencilModeSwitch"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:text="@string/pencil_mode"
-        android:textColor="@android:color/white"
-        android:shadowColor="@android:color/black"
-        android:shadowDx="1"
-        android:shadowDy="1"
-        android:shadowRadius="2"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/controlsVisibilityCheckbox" />
+        android:layout_below="@id/controlsVisibilityCheckbox"
+        android:layout_alignParentStart="true"
+        android:text="@string/pencil_mode" />
 
-    <!-- Кнопка для открытия диалога выбора слоев -->
     <Button
         android:id="@+id/layerSelectButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
+        android:layout_below="@id/pencilModeSwitch"
+        android:layout_alignParentStart="true"
         android:text="@string/select_layers"
-        android:visibility="gone"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/pencilModeSwitch" />
+        android:visibility="gone" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <CheckBox
+        android:id="@+id/hideImageCheckbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/layerSelectButton"
+        android:layout_alignParentStart="true"
+        android:text="@string/hide_image" />
+
+    <Button
+        android:id="@+id/saveParametersButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/hideImageCheckbox"
+        android:layout_alignParentStart="true"
+        android:text="@string/save_parameters" />
+
+    <Button
+        android:id="@+id/loadParametersButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/saveParametersButton"
+        android:layout_alignParentStart="true"
+        android:text="@string/load_parameters" />
+
+</RelativeLayout>

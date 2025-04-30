@@ -3,7 +3,6 @@
     <string name="pencil_mode">Pencil Mode</string>
     <string name="loaded_image_description">Loaded image</string>
     <string name="show_controls">Show Controls</string>
-   <string name="switch_camera">Переключить камеру</string>
     <string name="pick_image">Image</string>
     <string name="select_layers">Select Layers</string>
     <string name="layer_selection_title">Select Pencil</string>

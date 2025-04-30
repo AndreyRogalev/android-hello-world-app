@@ -56,9 +56,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -76,13 +74,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private static final String KEY_MATRIX_VALUES = "matrixValues";
     private static final String KEY_CONTROLS_VISIBLE = "controlsVisible";
     private static final String KEY_IMAGE_VISIBLE = "imageVisible";
-    private static final String KEY_SELECTED_CAMERA = "selectedCamera";
 
     // UI элементы
     private ImageView imageView;
     private SeekBar transparencySeekBar;
     private Button pickImageButton;
-    private Button switchCameraButton;
     private SurfaceView cameraSurfaceView;
     private SurfaceHolder cameraSurfaceHolder;
     private CheckBox controlsVisibilityCheckbox;
@@ -98,7 +94,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private CameraCaptureSession cameraCaptureSession;
     private String[] cameraIds;
     private String currentCameraId;
-    private List<String> cameraNames;
     private ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
     private ExecutorService imageLoadExecutor = Executors.newSingleThreadExecutor();
 
@@ -162,7 +157,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         imageView = findViewById(R.id.imageView);
         transparencySeekBar = findViewById(R.id.transparencySeekBar);
         pickImageButton = findViewById(R.id.pickImageButton);
-        switchCameraButton = findViewById(R.id.switchCameraButton);
         cameraSurfaceView = findViewById(R.id.cameraSurfaceView);
         controlsVisibilityCheckbox = findViewById(R.id.controlsVisibilityCheckbox);
         pencilModeSwitch = findViewById(R.id.pencilModeSwitch);
@@ -217,7 +211,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         // Настройка слушателей
         pickImageButton.setOnClickListener(v -> checkPermissionAndPickImage());
-        switchCameraButton.setOnClickListener(v -> switchCamera());
         transparencySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -301,11 +294,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
             isImageVisible = savedInstanceState.getBoolean(KEY_IMAGE_VISIBLE, true);
             hideImageCheckbox.setChecked(!isImageVisible);
-
-            int selectedCameraIndex = savedInstanceState.getInt(KEY_SELECTED_CAMERA, -1);
-            if (selectedCameraIndex >= 0 && selectedCameraIndex < cameraIds.length) {
-                currentCameraId = cameraIds[selectedCameraIndex];
-            }
         } else {
             hideImageCheckbox.setChecked(false);
             isImageVisible = true;
@@ -496,24 +484,22 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private void setupCameraSelector() {
         try {
             cameraIds = cameraManager.getCameraIdList();
-            cameraNames = new ArrayList<>();
             int defaultIndex = -1;
 
             for (int i = 0; i < cameraIds.length; i++) {
                 String cameraId = cameraIds[i];
                 CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
                 Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
-                String cameraName = (facing == CameraCharacteristics.LENS_FACING_BACK) ? "Back Camera" : "Front Camera";
-                cameraNames.add(cameraName);
                 if (facing == CameraCharacteristics.LENS_FACING_BACK) {
                     defaultIndex = i;
+                    break; // Выбираем заднюю камеру и выходим
                 }
             }
 
             if (defaultIndex != -1) {
                 currentCameraId = cameraIds[defaultIndex];
             } else if (cameraIds.length > 0) {
-                currentCameraId = cameraIds[0];
+                currentCameraId = cameraIds[0]; // Используем первую доступную камеру, если задняя недоступна
             }
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error accessing camera characteristics", e);
@@ -546,7 +532,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         String imageCheckboxText = show ? getString(R.string.hide_image) : "";
 
         pickImageButton.setVisibility(visibility);
-        switchCameraButton.setVisibility(visibility);
         transparencySeekBar.setVisibility(visibility);
         pencilModeSwitch.setVisibility(visibility);
         layerSelectButton.setVisibility(show && isPencilMode ? View.VISIBLE : View.GONE);
@@ -1026,30 +1011,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    public void switchCamera() {
-        if (cameraIds == null || cameraIds.length < 2) {
-            Toast.makeText(this, "Only one camera available", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        closeCamera();
-
-        int currentIndex = -1;
-        for (int i = 0; i < cameraIds.length; i++) {
-            if (cameraIds[i].equals(currentCameraId)) {
-                currentIndex = i;
-                break;
-            }
-        }
-
-        int newIndex = (currentIndex + 1) % cameraIds.length;
-        currentCameraId = cameraIds[newIndex];
-
-        if (cameraSurfaceHolder != null && cameraSurfaceHolder.getSurface().isValid()) {
-            openCamera();
-        }
-    }
-
     private void closeCamera() {
         if (cameraCaptureSession != null) {
             cameraCaptureSession.close();
@@ -1176,13 +1137,5 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         outState.putBoolean("isPencilMode", isPencilMode);
         outState.putBooleanArray("layerVisibility", layerVisibility);
         outState.putBoolean(KEY_IMAGE_VISIBLE, isImageVisible);
-        if (currentCameraId != null) {
-            for (int i = 0; i < cameraIds.length; i++) {
-                if (cameraIds[i].equals(currentCameraId)) {
-                    outState.putInt(KEY_SELECTED_CAMERA, i);
-                    break;
-                }
-            }
-        }
     }
 }
