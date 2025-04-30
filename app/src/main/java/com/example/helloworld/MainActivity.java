@@ -17,6 +17,7 @@ import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PointF;
+import android.graphics.SurfaceTexture; // Добавлен импорт
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -36,6 +37,8 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.WindowInsets; // Добавлен импорт для полноэкранного режима
+import android.view.WindowInsetsController; // Добавлен импорт для полноэкранного режима
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.ImageView;
@@ -91,7 +94,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private CheckBox hideImageCheckbox;
     private Button saveParametersButton;
     private Button loadParametersButton;
-    private Button switchCameraButton; // Новая кнопка для переключения камер
+    private Button switchCameraButton;
 
     // Camera2 API
     private CameraManager cameraManager;
@@ -151,9 +154,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Полноэкранный режим
-        getWindow().setFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        // Полноэкранный режим с учётом новых API
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+            getWindow().getInsetsController().hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+            getWindow().getInsetsController().setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        } else {
+            getWindow().setFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                    android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        }
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
         }
@@ -171,7 +180,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         hideImageCheckbox = findViewById(R.id.hideImageCheckbox);
         saveParametersButton = findViewById(R.id.saveParametersButton);
         loadParametersButton = findViewById(R.id.loadParametersButton);
-        switchCameraButton = findViewById(R.id.switchCameraButton); // Новая кнопка
+        switchCameraButton = findViewById(R.id.switchCameraButton);
 
         // Настройка ImageView для трансформаций
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
@@ -776,9 +785,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void setImageAlpha(int progress) {
-        int alpha = (int) (((float) progress / 100.0f) * 255);
+        float alpha = (float) progress / 100.0f; // Convert progress (0-100) to 0.0-1.0
         if (imageView != null) {
-            imageView.setImageAlpha(alpha);
+            imageView.setAlpha(alpha);
             imageView.invalidate();
         }
     }
@@ -1088,7 +1097,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         for (Size size : choices) {
             double ratio = (double) size.getWidth() / size.getHeight();
-            // Учитываем только размеры, которые ближе к соотношению сенсора
             if (Math.abs(ratio - targetRatio) < minDiff) {
                 optimalSize = size;
                 minDiff = Math.abs(ratio - targetRatio);
