@@ -571,7 +571,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 if (facing == CameraCharacteristics.LENS_FACING_BACK) {
                     rearCameraIds.add(cameraId);
                     if (defaultIndex == -1) {
-Abstract:defaultIndex = i; // Первая задняя камера по умолчанию
+                        defaultIndex = i; // Первая задняя камера по умолчанию
+                    }
                 }
                 // Логирование характеристик камеры для отладки
                 logCameraCharacteristics(cameraId);
@@ -761,8 +762,8 @@ Abstract:defaultIndex = i; // Первая задняя камера по умо
                 }
             } else {
                 Toast.makeText(activity, "Failed to load image", Toast.LENGTH_LONG).show();
-                activity.imageView.setImageBitmap(null);
-                activity.imageView.setVisibility(View.INVISIBLE);
+                imageView.setImageBitmap(null);
+                imageView.setVisibility(View.INVISIBLE);
                 activity.originalBitmap = null;
                 activity.pencilBitmap = null;
                 activity.layerBitmaps = null;
@@ -968,7 +969,7 @@ Abstract:defaultIndex = i; // Первая задняя камера по умо
             imageView.setVisibility(View.VISIBLE);
             imageView.post(() -> {
                 imageView.setImageMatrix(matrix);
-                imageView invalidate();
+                imageView.invalidate();
             });
         } else {
             imageView.setImageBitmap(originalBitmap);
