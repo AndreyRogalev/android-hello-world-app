@@ -168,6 +168,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         // Настройка ImageView для трансформаций
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
 
+        // Установим начальное значение ползунка прозрачности на 100
+        transparencySeekBar.setProgress(100);
+        setImageAlpha(100); // Устанавливаем начальную прозрачность изображения
+
         // Инициализация Activity Result Launcher
         imagePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -279,7 +283,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 loadImage(currentImageUri, false);
             }
 
-            setImageAlpha(transparencySeekBar.getProgress());
+            // Восстановим значение прозрачности из сохраненного состояния
+            int restoredProgress = savedInstanceState.getInt("transparencyProgress", 100);
+            transparencySeekBar.setProgress(restoredProgress);
+            setImageAlpha(restoredProgress);
 
             restoredControlsVisible = savedInstanceState.getBoolean(KEY_CONTROLS_VISIBLE, true);
             controlsVisibilityCheckbox.setChecked(restoredControlsVisible);
@@ -332,8 +339,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         try {
             saveFileLauncher.launch(intent);
         } catch (Exception e) {
-            Log.e(TAG, "Не удалось открыть диалог сохранения файла", e);
-            Toast.makeText(this, "Ошибка при открытии диалога сохранения", Toast.LENGTH_LONG).show();
+            Log.e(TAG, "Failed to open save file dialog", e);
+            Toast.makeText(this, "Error opening save dialog", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -344,14 +351,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         try {
             loadFileLauncher.launch(intent);
         } catch (Exception e) {
-            Log.e(TAG, "Не удалось открыть диалог загрузки файла", e);
-            Toast.makeText(this, "Ошибка при открытии диалога загрузки", Toast.LENGTH_LONG).show();
-        }
+            Log.e(TAG, "Failed to open load file dialog", e);
+            Toast.makeText(this, "Error opening load dialog", Toast.LENGTH_LONG).show();
+                    }
     }
 
     private void saveParametersToFile(Uri uri) {
         if (originalBitmap == null) {
-            Toast.makeText(this, "Нет изображения для сохранения параметров", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No image to save parameters", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -379,18 +386,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             try (OutputStream outputStream = resolver.openOutputStream(uri)) {
                 if (outputStream != null) {
                     outputStream.write(json.toString().getBytes());
-                    Toast.makeText(this, "Параметры сохранены", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Parameters saved", Toast.LENGTH_SHORT).show();
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Ошибка сохранения параметров", e);
-            Toast.makeText(this, "Не удалось сохранить параметры", Toast.LENGTH_LONG).show();
+            Log.e(TAG, "Error saving parameters", e);
+            Toast.makeText(this, "Failed to save parameters", Toast.LENGTH_LONG).show();
         }
     }
 
     private void loadParametersFromFile(Uri uri) {
         if (originalBitmap == null) {
-            Toast.makeText(this, "Сначала загрузите изображение", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Load an image first", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -431,12 +438,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     updateImageDisplay();
                     imageView.setImageMatrix(matrix);
 
-                    Toast.makeText(this, "Параметры загружены", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Parameters loaded", Toast.LENGTH_SHORT).show();
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Ошибка загрузки параметров", e);
-            Toast.makeText(this, "Не удалось загрузить параметры", Toast.LENGTH_LONG).show();
+            Log.e(TAG, "Error loading parameters", e);
+            Toast.makeText(this, "Failed to load parameters", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -1137,5 +1144,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         outState.putBoolean("isPencilMode", isPencilMode);
         outState.putBooleanArray("layerVisibility", layerVisibility);
         outState.putBoolean(KEY_IMAGE_VISIBLE, isImageVisible);
+        // Сохраняем текущее значение прозрачности
+        outState.putInt("transparencyProgress", transparencySeekBar.getProgress());
     }
 }
