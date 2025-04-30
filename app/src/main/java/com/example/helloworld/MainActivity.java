@@ -366,6 +366,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private void stopCameraBackgroundThread() {
         if (cameraHandlerThread != null) {
             cameraHandlerThread.quitSafely();
+            if (cameraHandler != null) {
+                cameraHandler.removeCallbacksAndMessages(null); // Удаляем все ожидающие обратные вызовы
+            }
             try {
                 cameraHandlerThread.join();
                 cameraHandlerThread = null;
@@ -568,8 +571,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 if (facing == CameraCharacteristics.LENS_FACING_BACK) {
                     rearCameraIds.add(cameraId);
                     if (defaultIndex == -1) {
-                        defaultIndex = i; // Первая задняя камера по умолчанию
-                    }
+Abstract:defaultIndex = i; // Первая задняя камера по умолчанию
                 }
                 // Логирование характеристик камеры для отладки
                 logCameraCharacteristics(cameraId);
@@ -966,7 +968,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             imageView.setVisibility(View.VISIBLE);
             imageView.post(() -> {
                 imageView.setImageMatrix(matrix);
-                imageView.invalidate();
+                imageView invalidate();
             });
         } else {
             imageView.setImageBitmap(originalBitmap);
@@ -1208,6 +1210,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
+                    if (cameraDevice == null) {
+                        Log.e(TAG, "Camera device is null in onConfigured, aborting session setup");
+                        session.close();
+                        cameraCaptureSession = null;
+                        return;
+                    }
                     cameraCaptureSession = session;
                     try {
                         CaptureRequest.Builder requestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
