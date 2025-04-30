@@ -8,5 +8,6 @@
     <string name="layer_selection_title">Select Pencil</string>
     <string name="hide_image">Hide Image</string>
      <string name="save_parameters">Save param</string>
-    <string name="load_parameters">Load param</string>
+     <string name="load_parameters">Load param</string>
+     <string name="switch_camera">Switch Camera</string>
 </resources>

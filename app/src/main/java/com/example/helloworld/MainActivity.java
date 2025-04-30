@@ -23,11 +23,13 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.params.StreamConfigurationMap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Log;
+import android.util.Size;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.Surface;
@@ -56,7 +58,9 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -87,6 +91,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private CheckBox hideImageCheckbox;
     private Button saveParametersButton;
     private Button loadParametersButton;
+    private Button switchCameraButton; // Новая кнопка для переключения камер
 
     // Camera2 API
     private CameraManager cameraManager;
@@ -94,6 +99,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private CameraCaptureSession cameraCaptureSession;
     private String[] cameraIds;
     private String currentCameraId;
+    private List<String> rearCameraIds = new ArrayList<>();
+    private int currentRearCameraIndex = 0;
     private ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
     private ExecutorService imageLoadExecutor = Executors.newSingleThreadExecutor();
 
@@ -164,13 +171,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         hideImageCheckbox = findViewById(R.id.hideImageCheckbox);
         saveParametersButton = findViewById(R.id.saveParametersButton);
         loadParametersButton = findViewById(R.id.loadParametersButton);
+        switchCameraButton = findViewById(R.id.switchCameraButton); // Новая кнопка
 
         // Настройка ImageView для трансформаций
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
-
-        // Установим начальное значение ползунка прозрачности на 100
-        transparencySeekBar.setProgress(100);
-        setImageAlpha(100); // Устанавливаем начальную прозрачность изображения
 
         // Инициализация Activity Result Launcher
         imagePickerLauncher = registerForActivityResult(
@@ -238,6 +242,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         });
         saveParametersButton.setOnClickListener(v -> checkPermissionAndSaveParameters());
         loadParametersButton.setOnClickListener(v -> checkPermissionAndLoadParameters());
+        switchCameraButton.setOnClickListener(v -> {
+            closeCamera();
+            currentRearCameraIndex = (currentRearCameraIndex + 1) % rearCameraIds.size();
+            currentCameraId = rearCameraIds.get(currentRearCameraIndex);
+            Log.d(TAG, "Switched to camera ID: " + currentCameraId);
+            openCamera();
+        });
 
         // Инициализация layerVisibility
         for (int i = 0; i < layerVisibility.length; i++) {
@@ -283,10 +294,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 loadImage(currentImageUri, false);
             }
 
-            // Восстановим значение прозрачности из сохраненного состояния
-            int restoredProgress = savedInstanceState.getInt("transparencyProgress", 100);
-            transparencySeekBar.setProgress(restoredProgress);
-            setImageAlpha(restoredProgress);
+            setImageAlpha(transparencySeekBar.getProgress());
 
             restoredControlsVisible = savedInstanceState.getBoolean(KEY_CONTROLS_VISIBLE, true);
             controlsVisibilityCheckbox.setChecked(restoredControlsVisible);
@@ -339,8 +347,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         try {
             saveFileLauncher.launch(intent);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to open save file dialog", e);
-            Toast.makeText(this, "Error opening save dialog", Toast.LENGTH_LONG).show();
+            Log.e(TAG, "Не удалось открыть диалог сохранения файла", e);
+            Toast.makeText(this, "Ошибка при открытии диалога сохранения", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -351,14 +359,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         try {
             loadFileLauncher.launch(intent);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to open load file dialog", e);
-            Toast.makeText(this, "Error opening load dialog", Toast.LENGTH_LONG).show();
-                    }
+            Log.e(TAG, "Не удалось открыть диалог загрузки файла", e);
+            Toast.makeText(this, "Ошибка при открытии диалога загрузки", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void saveParametersToFile(Uri uri) {
         if (originalBitmap == null) {
-            Toast.makeText(this, "No image to save parameters", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Нет изображения для сохранения параметров", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -386,18 +394,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             try (OutputStream outputStream = resolver.openOutputStream(uri)) {
                 if (outputStream != null) {
                     outputStream.write(json.toString().getBytes());
-                    Toast.makeText(this, "Parameters saved", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Параметры сохранены", Toast.LENGTH_SHORT).show();
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error saving parameters", e);
-            Toast.makeText(this, "Failed to save parameters", Toast.LENGTH_LONG).show();
+            Log.e(TAG, "Ошибка сохранения параметров", e);
+            Toast.makeText(this, "Не удалось сохранить параметры", Toast.LENGTH_LONG).show();
         }
     }
 
     private void loadParametersFromFile(Uri uri) {
         if (originalBitmap == null) {
-            Toast.makeText(this, "Load an image first", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Сначала загрузите изображение", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -438,12 +446,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     updateImageDisplay();
                     imageView.setImageMatrix(matrix);
 
-                    Toast.makeText(this, "Parameters loaded", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Параметры загружены", Toast.LENGTH_SHORT).show();
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error loading parameters", e);
-            Toast.makeText(this, "Failed to load parameters", Toast.LENGTH_LONG).show();
+            Log.e(TAG, "Ошибка загрузки параметров", e);
+            Toast.makeText(this, "Не удалось загрузить параметры", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -491,6 +499,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private void setupCameraSelector() {
         try {
             cameraIds = cameraManager.getCameraIdList();
+            rearCameraIds.clear();
             int defaultIndex = -1;
 
             for (int i = 0; i < cameraIds.length; i++) {
@@ -498,19 +507,49 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
                 Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
                 if (facing == CameraCharacteristics.LENS_FACING_BACK) {
-                    defaultIndex = i;
-                    break; // Выбираем заднюю камеру и выходим
+                    rearCameraIds.add(cameraId);
+                    if (defaultIndex == -1) {
+                        defaultIndex = i; // Первая задняя камера по умолчанию
+                    }
                 }
+                // Логирование характеристик камеры для отладки
+                logCameraCharacteristics(cameraId);
             }
 
             if (defaultIndex != -1) {
                 currentCameraId = cameraIds[defaultIndex];
             } else if (cameraIds.length > 0) {
-                currentCameraId = cameraIds[0]; // Используем первую доступную камеру, если задняя недоступна
+                currentCameraId = cameraIds[0];
+            } else {
+                Log.e(TAG, "No cameras available.");
+                Toast.makeText(this, "No cameras available on this device", Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            currentRearCameraIndex = rearCameraIds.indexOf(currentCameraId);
+            if (rearCameraIds.size() > 1) {
+                switchCameraButton.setVisibility(View.VISIBLE);
+            } else {
+                switchCameraButton.setVisibility(View.GONE);
             }
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error accessing camera characteristics", e);
             Toast.makeText(this, "Cannot access cameras: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void logCameraCharacteristics(String cameraId) {
+        try {
+            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
+            StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            Size[] previewSizes = map.getOutputSizes(SurfaceTexture.class);
+            Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
+            Float focalLength = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)[0];
+            Log.d(TAG, "Camera " + cameraId + ": Facing: " + (facing == CameraCharacteristics.LENS_FACING_BACK ? "BACK" : "FRONT"));
+            Log.d(TAG, "Camera " + cameraId + ": Focal Length: " + focalLength);
+            Log.d(TAG, "Camera " + cameraId + ": Preview Sizes: " + Arrays.toString(previewSizes));
+        } catch (CameraAccessException e) {
+            Log.e(TAG, "Error logging camera characteristics for camera " + cameraId, e);
         }
     }
 
@@ -544,6 +583,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         layerSelectButton.setVisibility(show && isPencilMode ? View.VISIBLE : View.GONE);
         saveParametersButton.setVisibility(visibility);
         loadParametersButton.setVisibility(visibility);
+        switchCameraButton.setVisibility(show && rearCameraIds.size() > 1 ? View.VISIBLE : View.GONE);
         controlsVisibilityCheckbox.setText(checkboxText);
         hideImageCheckbox.setText(imageCheckboxText);
         hideImageCheckbox.setVisibility(View.VISIBLE);
@@ -1029,12 +1069,79 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
+    private Size chooseOptimalPreviewSize(Size[] choices, int viewWidth, int viewHeight) {
+        // Предпочитаем соотношение сторон, близкое к 4:3 или 16:9, в зависимости от сенсора
+        double targetRatio;
+        try {
+            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(currentCameraId);
+            StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            Size sensorSize = map.getOutputSizes(SurfaceTexture.class)[0]; // Пример: берём первый размер
+            targetRatio = (double) sensorSize.getWidth() / sensorSize.getHeight();
+        } catch (CameraAccessException e) {
+            Log.e(TAG, "Error accessing camera characteristics for preview size", e);
+            targetRatio = (double) viewWidth / viewHeight; // Fallback
+        }
+
+        // Минимальная разница между соотношениями
+        Size optimalSize = null;
+        double minDiff = Double.MAX_VALUE;
+
+        for (Size size : choices) {
+            double ratio = (double) size.getWidth() / size.getHeight();
+            // Учитываем только размеры, которые ближе к соотношению сенсора
+            if (Math.abs(ratio - targetRatio) < minDiff) {
+                optimalSize = size;
+                minDiff = Math.abs(ratio - targetRatio);
+            }
+        }
+
+        // Если ничего не нашли, берём первый доступный размер
+        if (optimalSize == null && choices.length > 0) {
+            optimalSize = choices[0];
+        }
+
+        Log.d(TAG, "Chosen preview size: " + optimalSize.getWidth() + "x" + optimalSize.getHeight());
+        return optimalSize;
+    }
+
     private void startCameraPreview() {
         if (cameraDevice == null || !cameraSurfaceHolder.getSurface().isValid()) {
+            Log.w(TAG, "Cannot start camera preview: device or surface not ready");
             return;
         }
 
         try {
+            // Получаем характеристики камеры
+            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(currentCameraId);
+            StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            Size[] previewSizes = map.getOutputSizes(SurfaceTexture.class);
+
+            // Выбираем оптимальный размер предпросмотра
+            int viewWidth = cameraSurfaceView.getWidth();
+            int viewHeight = cameraSurfaceView.getHeight();
+            if (viewWidth == 0 || viewHeight == 0) {
+                Log.w(TAG, "SurfaceView dimensions are 0, deferring preview start");
+                return;
+            }
+
+            Size previewSize = chooseOptimalPreviewSize(previewSizes, viewWidth, viewHeight);
+
+            // Настраиваем размер SurfaceView с учётом соотношения сторон
+            float previewRatio = (float) previewSize.getWidth() / previewSize.getHeight();
+            float viewRatio = (float) viewWidth / viewHeight;
+
+            if (previewRatio > viewRatio) {
+                // Если предпросмотр шире, чем SurfaceView, подгоняем по ширине
+                int newHeight = (int) (viewWidth / previewRatio);
+                cameraSurfaceHolder.setFixedSize(viewWidth, newHeight);
+                Log.d(TAG, "Adjusted SurfaceView to " + viewWidth + "x" + newHeight);
+            } else {
+                // Если предпросмотр выше, подгоняем по высоте
+                int newWidth = (int) (viewHeight * previewRatio);
+                cameraSurfaceHolder.setFixedSize(newWidth, viewHeight);
+                Log.d(TAG, "Adjusted SurfaceView to " + newWidth + "x" + viewHeight);
+            }
+
             Surface surface = cameraSurfaceHolder.getSurface();
             cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
                 @Override
@@ -1045,6 +1152,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                         requestBuilder.addTarget(surface);
                         requestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                         cameraCaptureSession.setRepeatingRequest(requestBuilder.build(), null, null);
+                        Log.d(TAG, "Camera preview started successfully");
                     } catch (CameraAccessException e) {
                         Log.e(TAG, "Error setting up preview", e);
                     }
@@ -1053,10 +1161,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {
                     Toast.makeText(MainActivity.this, "Failed to configure camera session", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Failed to configure camera session");
                 }
             }, null);
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error creating capture session", e);
+            Toast.makeText(this, "Error creating camera session: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -1144,7 +1254,5 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         outState.putBoolean("isPencilMode", isPencilMode);
         outState.putBooleanArray("layerVisibility", layerVisibility);
         outState.putBoolean(KEY_IMAGE_VISIBLE, isImageVisible);
-        // Сохраняем текущее значение прозрачности
-        outState.putInt("transparencyProgress", transparencySeekBar.getProgress());
     }
 }
