@@ -269,8 +269,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         controlsVisibilityCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> updateControlsVisibility(isChecked));
         pencilModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isPencilMode = isChecked;
-            layerSelectButton.setVisibility(isChecked ? View.VISIBLE : View.GONE);
-            updateImageDisplay();
+            runOnUiThread(() -> {
+                layerSelectButton.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+                updateImageDisplay();
+            });
         });
         layerSelectButton.setOnClickListener(v -> showLayerSelectionDialog());
         hideImageCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -1111,12 +1113,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 public void onError(@NonNull CameraDevice camera, int error) {
                     camera.close();
                     cameraDevice = null;
-                    Toast.makeText(MainActivity.this, "Camera error: " + error, Toast.LENGTH_SHORT).show();
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Camera error: " + error, Toast.LENGTH_SHORT).show());
                 }
             }, cameraHandler);
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error opening camera", e);
-            Toast.makeText(this, "Cannot open camera", Toast.LENGTH_SHORT).show();
+            runOnUiThread(() -> Toast.makeText(this, "Cannot open camera", Toast.LENGTH_SHORT).show());
         }
     }
 
@@ -1195,17 +1197,20 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             float previewRatio = (float) previewSize.getWidth() / previewSize.getHeight();
             float viewRatio = (float) viewWidth / viewHeight;
 
-            if (previewRatio > viewRatio) {
-                // Если предпросмотр шире, чем SurfaceView, подгоняем по ширине
-                int newHeight = (int) (viewWidth / previewRatio);
-                cameraSurfaceHolder.setFixedSize(viewWidth, newHeight);
-                Log.d(TAG, "Adjusted SurfaceView to " + viewWidth + "x" + newHeight);
-            } else {
-                // Если предпросмотр выше, подгоняем по высоте
-                int newWidth = (int) (viewHeight * previewRatio);
-                cameraSurfaceHolder.setFixedSize(newWidth, viewHeight);
-                Log.d(TAG, "Adjusted SurfaceView to " + newWidth + "x" + viewHeight);
-            }
+            // Переносим вызов setFixedSize в основной поток
+            runOnUiThread(() -> {
+                if (previewRatio > viewRatio) {
+                    // Если предпросмотр шире, чем SurfaceView, подгоняем по ширине
+                    int newHeight = (int) (viewWidth / previewRatio);
+                    cameraSurfaceHolder.setFixedSize(viewWidth, newHeight);
+                    Log.d(TAG, "Adjusted SurfaceView to " + viewWidth + "x" + newHeight);
+                } else {
+                    // Если предпросмотр выше, подгоняем по высоте
+                    int newWidth = (int) (viewHeight * previewRatio);
+                    cameraSurfaceHolder.setFixedSize(newWidth, viewHeight);
+                    Log.d(TAG, "Adjusted SurfaceView to " + newWidth + "x" + viewHeight);
+                }
+            });
 
             Surface surface = cameraSurfaceHolder.getSurface();
             cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
@@ -1236,13 +1241,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-                    Toast.makeText(MainActivity.this, "Failed to configure camera session", Toast.LENGTH_SHORT).show();
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Failed to configure camera session", Toast.LENGTH_SHORT).show());
                     Log.e(TAG, "Failed to configure camera session");
                 }
             }, cameraHandler);
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error creating capture session", e);
-            Toast.makeText(this, "Error creating camera session: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            runOnUiThread(() -> Toast.makeText(this, "Error creating camera session: " + e.getMessage(), Toast.LENGTH_LONG).show());
         }
     }
 
