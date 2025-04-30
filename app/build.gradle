@@ -3,6 +3,7 @@ plugins {
 }
 
 android {
+    namespace 'com.example.helloworld' // Добавлено пространство имён
     compileSdk 34
 
     defaultConfig {
