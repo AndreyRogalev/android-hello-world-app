@@ -111,6 +111,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private ExecutorService imageLoadExecutor = Executors.newSingleThreadExecutor();
     private HandlerThread cameraHandlerThread;
     private Handler cameraHandler;
+    private boolean isSurfaceReady = false;
 
     // Манипуляции с изображением
     private Bitmap originalBitmap = null;
@@ -173,7 +174,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
                 } else {
                     Log.w(TAG, "WindowInsetsController is null, falling back to older API");
-                    // Fallback для старых API
                     window.setFlags(
                             android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
                             android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -181,7 +181,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 }
             } else {
                 Log.e(TAG, "Window is null, falling back to older API");
-                // Fallback
                 getWindow().setFlags(
                         android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
                         android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -269,12 +268,17 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         controlsVisibilityCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> updateControlsVisibility(isChecked));
         pencilModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isPencilMode = isChecked;
+            Log.d(TAG, "Pencil mode toggled: isPencilMode=" + isPencilMode);
             runOnUiThread(() -> {
                 layerSelectButton.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+                Log.d(TAG, "layerSelectButton visibility set to: " + (isChecked ? "VISIBLE" : "GONE"));
                 updateImageDisplay();
             });
         });
-        layerSelectButton.setOnClickListener(v -> showLayerSelectionDialog());
+        layerSelectButton.setOnClickListener(v -> {
+            Log.d(TAG, "layerSelectButton clicked");
+            showLayerSelectionDialog();
+        });
         hideImageCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isImageVisible = !isChecked;
             updateImageDisplay();
@@ -618,20 +622,29 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void showLayerSelectionDialog() {
+        Log.d(TAG, "showLayerSelectionDialog: Creating dialog");
         Dialog dialog = new Dialog(this);
         dialog.setContentView(R.layout.dialog_layer_selection);
         dialog.setTitle(R.string.layer_selection_title);
 
         RecyclerView recyclerView = dialog.findViewById(R.id.layerRecyclerView);
+        if (recyclerView == null) {
+            Log.e(TAG, "showLayerSelectionDialog: RecyclerView is null, check dialog_layer_selection.xml");
+            return;
+        }
+        Log.d(TAG, "showLayerSelectionDialog: RecyclerView found");
+
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         LayerAdapter adapter = new LayerAdapter(PENCIL_HARDNESS, layerVisibility, this);
         recyclerView.setAdapter(adapter);
+        Log.d(TAG, "showLayerSelectionDialog: Adapter set, showing dialog");
 
         dialog.show();
     }
 
     @Override
     public void onLayerVisibilityChanged(int position, boolean isVisible) {
+        Log.d(TAG, "onLayerVisibilityChanged: position=" + position + ", isVisible=" + isVisible);
         layerVisibility[position] = isVisible;
         updateImageDisplay();
     }
@@ -931,7 +944,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void updateImageDisplay() {
+        Log.d(TAG, "updateImageDisplay: isPencilMode=" + isPencilMode + ", isImageVisible=" + isImageVisible);
         if (originalBitmap == null || !isImageVisible) {
+            Log.d(TAG, "updateImageDisplay: originalBitmap is null or image is not visible");
             imageView.setImageBitmap(null);
             imageView.setVisibility(View.INVISIBLE);
             imageView.invalidate();
@@ -939,11 +954,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
 
         if (isPencilMode) {
+            Log.d(TAG, "updateImageDisplay: Processing pencil mode");
             if (pencilBitmap == null || layerBitmaps == null) {
                 processPencilEffect();
             }
 
             if (pencilBitmap == null || layerBitmaps == null) {
+                Log.d(TAG, "updateImageDisplay: pencilBitmap or layerBitmaps is null");
                 imageView.setImageBitmap(null);
                 imageView.setVisibility(View.INVISIBLE);
                 imageView.invalidate();
@@ -952,6 +969,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
             Bitmap resultBitmap = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
             if (resultBitmap == null) {
+                Log.d(TAG, "updateImageDisplay: Failed to create resultBitmap");
                 imageView.setImageBitmap(null);
                 imageView.setVisibility(View.INVISIBLE);
                 imageView.invalidate();
@@ -973,7 +991,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 imageView.setImageMatrix(matrix);
                 imageView.invalidate();
             });
+            Log.d(TAG, "updateImageDisplay: Pencil mode applied");
         } else {
+            Log.d(TAG, "updateImageDisplay: Displaying original bitmap");
             imageView.setImageBitmap(originalBitmap);
             setImageAlpha(transparencySeekBar.getProgress());
             imageView.setVisibility(View.VISIBLE);
@@ -981,6 +1001,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 imageView.setImageMatrix(matrix);
                 imageView.invalidate();
             });
+            Log.d(TAG, "updateImageDisplay: Original bitmap displayed");
         }
     }
 
@@ -1095,22 +1116,30 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             return;
         }
 
+        if (!isSurfaceReady) {
+            Log.d(TAG, "openCamera: Surface not ready yet, deferring camera open");
+            return;
+        }
+
         try {
             cameraManager.openCamera(currentCameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice camera) {
+                    Log.d(TAG, "Camera opened successfully");
                     cameraDevice = camera;
                     startCameraPreview();
                 }
 
                 @Override
                 public void onDisconnected(@NonNull CameraDevice camera) {
+                    Log.d(TAG, "Camera disconnected");
                     camera.close();
                     cameraDevice = null;
                 }
 
                 @Override
                 public void onError(@NonNull CameraDevice camera, int error) {
+                    Log.e(TAG, "Camera error: " + error);
                     camera.close();
                     cameraDevice = null;
                     runOnUiThread(() -> Toast.makeText(MainActivity.this, "Camera error: " + error, Toast.LENGTH_SHORT).show());
@@ -1177,6 +1206,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             return;
         }
 
+        Log.d(TAG, "startCameraPreview: Starting preview setup");
         try {
             // Получаем характеристики камеры
             CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(currentCameraId);
@@ -1213,6 +1243,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             });
 
             Surface surface = cameraSurfaceHolder.getSurface();
+            Log.d(TAG, "startCameraPreview: Creating capture session");
             cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
@@ -1228,6 +1259,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                         requestBuilder.addTarget(surface);
                         requestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                         if (cameraCaptureSession != null) {
+                            Log.d(TAG, "startCameraPreview: Setting repeating request");
                             cameraCaptureSession.setRepeatingRequest(requestBuilder.build(), null, cameraHandler);
                             Log.d(TAG, "Camera preview started successfully");
                         } else {
@@ -1254,18 +1286,21 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     public void surfaceCreated(@NonNull SurfaceHolder holder) {
         Log.d(TAG, "Surface created.");
+        isSurfaceReady = true;
         openCamera();
     }
 
     @Override
     public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
         Log.d(TAG, "Surface changed. New dimensions: " + width + "x" + height);
+        isSurfaceReady = true;
         startCameraPreview();
     }
 
     @Override
     public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
         Log.d(TAG, "Surface destroyed.");
+        isSurfaceReady = false;
         closeCamera();
     }
 
@@ -1274,8 +1309,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         super.onResume();
         Log.d(TAG, "onResume");
         startCameraBackgroundThread();
-        if (cameraDevice == null && cameraSurfaceHolder != null && cameraSurfaceHolder.getSurface().isValid()) {
+        if (cameraDevice == null && isSurfaceReady) {
+            Log.d(TAG, "onResume: Surface ready, opening camera");
             openCamera();
+        } else {
+            Log.d(TAG, "onResume: Surface not ready or camera already opened");
         }
         if (currentImageUri != null && originalBitmap == null) {
             loadImage(currentImageUri, true);
