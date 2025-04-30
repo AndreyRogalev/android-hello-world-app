@@ -17,7 +17,7 @@ import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PointF;
-import android.graphics.SurfaceTexture; // Добавлен импорт
+import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -37,8 +37,8 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.WindowInsets; // Добавлен импорт для полноэкранного режима
-import android.view.WindowInsetsController; // Добавлен импорт для полноэкранного режима
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.ImageView;
@@ -154,20 +154,33 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Устанавливаем layout перед настройкой окна
+        setContentView(R.layout.activity_main);
+
         // Полноэкранный режим с учётом новых API
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             getWindow().setDecorFitsSystemWindows(false);
-            getWindow().getInsetsController().hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
-            getWindow().getInsetsController().setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) { // Добавляем проверку на null
+                controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            } else {
+                Log.w(TAG, "WindowInsetsController is null, falling back to older API");
+                // Fallback для старых API
+                getWindow().setFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                        android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+                );
+            }
         } else {
-            getWindow().setFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                    android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            getWindow().setFlags(
+                    android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                    android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+            );
         }
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
         }
-
-        setContentView(R.layout.activity_main);
 
         // Инициализация UI
         imageView = findViewById(R.id.imageView);
