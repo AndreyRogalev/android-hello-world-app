@@ -3,8 +3,8 @@ package com.example.helloworld;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.CheckedTextView;
-
+import android.widget.CheckBox;
+import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -28,19 +28,18 @@ public class LayerAdapter extends RecyclerView.Adapter<LayerAdapter.ViewHolder> 
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(android.R.layout.simple_list_item_multiple_choice, parent, false);
+                .inflate(android.R.layout.simple_list_item_2, parent, false);
         return new ViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        holder.checkedTextView.setText(layers[position]);
-        holder.checkedTextView.setChecked(visibility[position]);
-        holder.checkedTextView.setOnClickListener(v -> {
-            visibility[position] = !visibility[position];
-            holder.checkedTextView.setChecked(visibility[position]);
+        holder.text1.setText(layers[position]);
+        holder.checkBox.setChecked(visibility[position]);
+        holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            visibility[position] = isChecked;
             if (listener != null) {
-                listener.onLayerVisibilityChanged(position, visibility[position]);
+                listener.onLayerVisibilityChanged(position, isChecked);
             }
         });
     }
@@ -50,12 +49,17 @@ public class LayerAdapter extends RecyclerView.Adapter<LayerAdapter.ViewHolder> 
         return layers.length;
     }
 
-    public static class ViewHolder extends RecyclerView.ViewHolder {
-        final CheckedTextView checkedTextView;
+    static class ViewHolder extends RecyclerView.ViewHolder {
+        TextView text1;
+        CheckBox checkBox;
 
-        public ViewHolder(@NonNull View itemView) {
+        ViewHolder(View itemView) {
             super(itemView);
-            checkedTextView = itemView.findViewById(android.R.id.text1);
+            text1 = itemView.findViewById(android.R.id.text1);
+            checkBox = new CheckBox(itemView.getContext());
+            // Добавляем CheckBox в layout элемента
+            ViewGroup parent = (ViewGroup) text1.getParent();
+            parent.addView(checkBox);
         }
     }
 }

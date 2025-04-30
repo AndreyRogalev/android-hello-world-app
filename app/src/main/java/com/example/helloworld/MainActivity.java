@@ -28,6 +28,8 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.util.Size;
@@ -37,6 +39,7 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.widget.Button;
@@ -106,6 +109,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private int currentRearCameraIndex = 0;
     private ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
     private ExecutorService imageLoadExecutor = Executors.newSingleThreadExecutor();
+    private HandlerThread cameraHandlerThread;
+    private Handler cameraHandler;
 
     // Манипуляции с изображением
     private Bitmap originalBitmap = null;
@@ -159,14 +164,24 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         // Полноэкранный режим с учётом новых API
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setDecorFitsSystemWindows(false);
-            WindowInsetsController controller = getWindow().getInsetsController();
-            if (controller != null) { // Добавляем проверку на null
-                controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
-                controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            Window window = getWindow();
+            if (window != null) {
+                window.setDecorFitsSystemWindows(false);
+                WindowInsetsController controller = window.getInsetsController();
+                if (controller != null) {
+                    controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                    controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                } else {
+                    Log.w(TAG, "WindowInsetsController is null, falling back to older API");
+                    // Fallback для старых API
+                    window.setFlags(
+                            android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                            android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+                    );
+                }
             } else {
-                Log.w(TAG, "WindowInsetsController is null, falling back to older API");
-                // Fallback для старых API
+                Log.e(TAG, "Window is null, falling back to older API");
+                // Fallback
                 getWindow().setFlags(
                         android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
                         android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -289,6 +304,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         setupCameraSelector();
 
+        // Запуск фонового потока для операций с камерой
+        startCameraBackgroundThread();
+
         // Запрос разрешения на использование камеры
         checkCameraPermission();
 
@@ -337,6 +355,25 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
 
         updateControlsVisibility(restoredControlsVisible);
+    }
+
+    private void startCameraBackgroundThread() {
+        cameraHandlerThread = new HandlerThread("CameraBackground");
+        cameraHandlerThread.start();
+        cameraHandler = new Handler(cameraHandlerThread.getLooper());
+    }
+
+    private void stopCameraBackgroundThread() {
+        if (cameraHandlerThread != null) {
+            cameraHandlerThread.quitSafely();
+            try {
+                cameraHandlerThread.join();
+                cameraHandlerThread = null;
+                cameraHandler = null;
+            } catch (InterruptedException e) {
+                Log.e(TAG, "Error stopping camera background thread", e);
+            }
+        }
     }
 
     private void checkPermissionAndSaveParameters() {
@@ -1073,7 +1110,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     cameraDevice = null;
                     Toast.makeText(MainActivity.this, "Camera error: " + error, Toast.LENGTH_SHORT).show();
                 }
-            }, null);
+            }, cameraHandler);
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error opening camera", e);
             Toast.makeText(this, "Cannot open camera", Toast.LENGTH_SHORT).show();
@@ -1081,13 +1118,17 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void closeCamera() {
-        if (cameraCaptureSession != null) {
-            cameraCaptureSession.close();
-            cameraCaptureSession = null;
-        }
-        if (cameraDevice != null) {
-            cameraDevice.close();
-            cameraDevice = null;
+        try {
+            if (cameraCaptureSession != null) {
+                cameraCaptureSession.close();
+                cameraCaptureSession = null;
+            }
+            if (cameraDevice != null) {
+                cameraDevice.close();
+                cameraDevice = null;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error closing camera", e);
         }
     }
 
@@ -1172,10 +1213,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                         CaptureRequest.Builder requestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
                         requestBuilder.addTarget(surface);
                         requestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-                        cameraCaptureSession.setRepeatingRequest(requestBuilder.build(), null, null);
-                        Log.d(TAG, "Camera preview started successfully");
-                    } catch (CameraAccessException e) {
+                        if (cameraCaptureSession != null) {
+                            cameraCaptureSession.setRepeatingRequest(requestBuilder.build(), null, cameraHandler);
+                            Log.d(TAG, "Camera preview started successfully");
+                        } else {
+                            Log.e(TAG, "CameraCaptureSession is null, cannot set repeating request");
+                        }
+                    } catch (CameraAccessException | IllegalStateException e) {
                         Log.e(TAG, "Error setting up preview", e);
+                        closeCamera();
                     }
                 }
 
@@ -1184,7 +1230,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     Toast.makeText(MainActivity.this, "Failed to configure camera session", Toast.LENGTH_SHORT).show();
                     Log.e(TAG, "Failed to configure camera session");
                 }
-            }, null);
+            }, cameraHandler);
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error creating capture session", e);
             Toast.makeText(this, "Error creating camera session: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -1213,6 +1259,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onResume() {
         super.onResume();
         Log.d(TAG, "onResume");
+        startCameraBackgroundThread();
         if (cameraDevice == null && cameraSurfaceHolder != null && cameraSurfaceHolder.getSurface().isValid()) {
             openCamera();
         }
@@ -1227,6 +1274,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         super.onPause();
         Log.d(TAG, "onPause");
         closeCamera();
+        stopCameraBackgroundThread();
     }
 
     @Override
@@ -1234,6 +1282,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         super.onDestroy();
         Log.d(TAG, "onDestroy");
         closeCamera();
+        stopCameraBackgroundThread();
         cameraExecutor.shutdown();
         imageLoadExecutor.shutdown();
         if (originalBitmap != null && !originalBitmap.isRecycled()) {
