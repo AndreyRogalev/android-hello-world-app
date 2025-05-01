@@ -30,7 +30,7 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewGroup; // Добавлен импорт
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.ImageView;
@@ -76,8 +76,9 @@ public class MainActivity extends AppCompatActivity {
     private HandlerThread backgroundThread;
     private Handler backgroundHandler;
     private final Semaphore cameraOpenCloseLock = new Semaphore(1);
-    private boolean isSurfaceAvailable = false;
-    private boolean isCameraPendingOpen = false;
+    private volatile boolean isSurfaceAvailable = false;
+    private volatile boolean isCameraPendingOpen = false;
+    private volatile boolean isCameraOpen = false;
 
     private Bitmap originalBitmap;
     private Bitmap pencilBitmap;
@@ -151,7 +152,7 @@ public class MainActivity extends AppCompatActivity {
             public void surfaceCreated(SurfaceHolder holder) {
                 Log.d(TAG, "Surface created");
                 isSurfaceAvailable = true;
-                if (isCameraPendingOpen) {
+                if (isCameraPendingOpen && !isCameraOpen) {
                     openCamera();
                     isCameraPendingOpen = false;
                 }
@@ -160,7 +161,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed: " + width + "x" + height);
-                adjustSurfaceViewAspectRatio(width, height);
+                adjustSurfaceViewAspectRatioWithCropping(width, height);
                 if (cameraDevice != null && isSurfaceAvailable) {
                     closeCameraPreviewSession();
                     previewSize = chooseOptimalPreviewSize(getPreviewSizes(), width, height);
@@ -239,7 +240,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void adjustSurfaceViewAspectRatio(int width, int height) {
+    private void adjustSurfaceViewAspectRatioWithCropping(int width, int height) {
         if (previewSize == null) {
             return;
         }
@@ -249,21 +250,35 @@ public class MainActivity extends AppCompatActivity {
 
         int newWidth, newHeight;
         if (previewRatio > viewRatio) {
-            // Подгоняем по ширине, высота подстраивается
+            // Обрезаем по высоте, чтобы заполнить экран по ширине
             newWidth = width;
             newHeight = (int) (width / previewRatio);
         } else {
-            // Подгоняем по высоте, ширина подстраивается
+            // Обрезаем по ширине, чтобы заполнить экран по высоте
             newHeight = height;
             newWidth = (int) (height * previewRatio);
         }
 
+        // Масштабируем SurfaceView так, чтобы он заполнил весь экран с обрезкой
         ViewGroup.LayoutParams params = cameraSurfaceView.getLayoutParams();
-        params.width = newWidth;
-        params.height = newHeight;
+        params.width = width;
+        params.height = height;
         cameraSurfaceView.setLayoutParams(params);
+
+        // Применяем масштабирование для обрезки краёв
+        float scaleX = (float) width / newWidth;
+        float scaleY = (float) height / newHeight;
+        float scale = Math.max(scaleX, scaleY); // Выбираем больший масштаб для обрезки
+
+        cameraSurfaceView.setScaleX(scale);
+        cameraSurfaceView.setScaleY(scale);
+
+        // Центрируем изображение
+        cameraSurfaceView.setPivotX(width / 2f);
+        cameraSurfaceView.setPivotY(height / 2f);
+
         cameraSurfaceView.requestLayout();
-        Log.d(TAG, "Adjusted SurfaceView to " + newWidth + "x" + newHeight + " (preview ratio: " + previewRatio + ")");
+        Log.d(TAG, "Adjusted SurfaceView with cropping to " + width + "x" + height + " (preview ratio: " + previewRatio + ")");
     }
 
     @Override
@@ -271,7 +286,7 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                if (isSurfaceAvailable) {
+                if (isSurfaceAvailable && !isCameraOpen) {
                     openCamera();
                 } else {
                     isCameraPendingOpen = true;
@@ -311,8 +326,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openCamera() {
-        if (!isSurfaceAvailable) {
-            Log.d(TAG, "Surface not available, setting pending open");
+        if (!isSurfaceAvailable || isCameraOpen) {
+            Log.d(TAG, "Surface not available or camera already open, setting pending open");
             isCameraPendingOpen = true;
             return;
         }
@@ -332,6 +347,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             cameraOpenCloseLock.acquire();
+            isCameraOpen = true;
             manager.openCamera(cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice camera) {
@@ -350,6 +366,7 @@ public class MainActivity extends AppCompatActivity {
                     cameraOpenCloseLock.release();
                     camera.close();
                     cameraDevice = null;
+                    isCameraOpen = false;
                 }
 
                 @Override
@@ -357,15 +374,18 @@ public class MainActivity extends AppCompatActivity {
                     cameraOpenCloseLock.release();
                     camera.close();
                     cameraDevice = null;
+                    isCameraOpen = false;
                     Toast.makeText(MainActivity.this, "Camera error: " + error, Toast.LENGTH_LONG).show();
                 }
             }, backgroundHandler);
         } catch (CameraAccessException e) {
             Log.e(TAG, "Cannot access camera", e);
             Toast.makeText(this, "Cannot access camera", Toast.LENGTH_LONG).show();
+            isCameraOpen = false;
         } catch (InterruptedException e) {
             Log.e(TAG, "Interrupted while opening camera", e);
             cameraOpenCloseLock.release();
+            isCameraOpen = false;
         }
     }
 
@@ -418,8 +438,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void createCameraPreviewSession() {
-        if (!isSurfaceAvailable || cameraDevice == null) {
-            Log.d(TAG, "Cannot create preview session: Surface not available or cameraDevice is null");
+        if (!isSurfaceAvailable || cameraDevice == null || !isCameraOpen) {
+            Log.d(TAG, "Cannot create preview session: Surface not available, cameraDevice is null, or camera is closed");
             return;
         }
 
@@ -437,8 +457,8 @@ public class MainActivity extends AppCompatActivity {
             cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
-                    if (cameraDevice == null || !isSurfaceAvailable) {
-                        Log.d(TAG, "Camera device closed or surface not available during session configuration");
+                    if (cameraDevice == null || !isSurfaceAvailable || !isCameraOpen) {
+                        Log.d(TAG, "Camera device closed, surface not available, or camera not open during session configuration");
                         session.close();
                         return;
                     }
@@ -449,6 +469,8 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "Camera preview session started");
                     } catch (CameraAccessException e) {
                         Log.e(TAG, "Error setting up camera preview", e);
+                    } catch (IllegalStateException e) {
+                        Log.e(TAG, "Session already closed during setRepeatingRequest", e);
                     }
                 }
 
@@ -477,6 +499,7 @@ public class MainActivity extends AppCompatActivity {
                 cameraDevice.close();
                 cameraDevice = null;
             }
+            isCameraOpen = false;
         } catch (InterruptedException e) {
             Log.e(TAG, "Error closing camera", e);
         } finally {
@@ -493,7 +516,7 @@ public class MainActivity extends AppCompatActivity {
             int currentCameraIndex = Arrays.asList(cameraIds).indexOf(cameraId);
             int nextCameraIndex = (currentCameraIndex + 1) % cameraIds.length;
             cameraId = cameraIds[nextCameraIndex];
-            if (isSurfaceAvailable) {
+            if (isSurfaceAvailable && !isCameraOpen) {
                 openCamera();
             } else {
                 isCameraPendingOpen = true;
@@ -673,6 +696,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
+            Bitmap resultBitmap = Bitmap.createBitmap(originalBitmap
             Bitmap resultBitmap = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
             if (resultBitmap == null) {
                 Log.d(TAG, "updateImageDisplay: Failed to create resultBitmap");
@@ -782,7 +806,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (isSurfaceAvailable && !isCameraPendingOpen) {
+        if (isSurfaceAvailable && !isCameraOpen) {
             openCamera();
         } else {
             isCameraPendingOpen = true;
