@@ -130,7 +130,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     // Манипуляции с изображением
     private Bitmap originalBitmap = null;
     private Matrix matrix = new Matrix();
-    private float scaleFactor = 1.0f; // Текущий масштаб (относительно начального fitCenter)
+    private float scaleFactor = 1.0f; // Глобальный масштаб для ScaleListener
     private Uri currentImageUri;
 
     // Карандашный режим
@@ -232,6 +232,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     }
                 }
         );
+
         saveFileLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -243,6 +244,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     }
                 }
         );
+
         loadFileLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -294,12 +296,25 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
                 controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
             } else {
+                // Fallback
                 //noinspection deprecation
-                getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN);
+                getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_FULLSCREEN);
             }
         } else {
             //noinspection deprecation
-            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN);
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_FULLSCREEN);
         }
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
@@ -371,7 +386,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-
     // --- Логика Камеры (Camera2 API) ---
     private void setupCameraSelector() {
         if (cameraManager == null) return;
@@ -403,6 +417,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 Toast.makeText(this, "No cameras found on this device", Toast.LENGTH_LONG).show();
                 currentCameraId = null;
             }
+
+            // Обновляем видимость кнопки переключения
             runOnUiThread(() -> switchCameraButton.setVisibility(rearCameraIds != null && rearCameraIds.size() > 1 ? View.VISIBLE : View.GONE));
 
         } catch (CameraAccessException e) {
@@ -601,13 +617,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 Surface surface = cameraSurfaceHolder.getSurface();
                 final Size finalPreviewSize = previewSize;
                 runOnUiThread(() -> {
-                    if (cameraSurfaceHolder != null && cameraSurfaceHolder.getSurface() != null && cameraSurfaceHolder.getSurface().isValid()) {
-                        try {
-                            cameraSurfaceHolder.setFixedSize(finalPreviewSize.getWidth(), finalPreviewSize.getHeight());
-                            Log.d(TAG, "Set SurfaceHolder fixed size for preview (UI Thread): " + finalPreviewSize.getWidth() + "x" + finalPreviewSize.getHeight());
-                        } catch(Exception e) { Log.e(TAG, "Error setting fixed size in startCameraPreview", e); }
-                    } else { Log.w(TAG, "Surface became invalid before setting fixed size."); }
-                });
+                     if (cameraSurfaceHolder != null && cameraSurfaceHolder.getSurface() != null && cameraSurfaceHolder.getSurface().isValid()) {
+                         try {
+                             cameraSurfaceHolder.setFixedSize(finalPreviewSize.getWidth(), finalPreviewSize.getHeight());
+                             Log.d(TAG, "Set SurfaceHolder fixed size for preview (UI Thread): " + finalPreviewSize.getWidth() + "x" + finalPreviewSize.getHeight());
+                         } catch(Exception e) { Log.e(TAG, "Error setting fixed size in startCameraPreview", e); }
+                     } else { Log.w(TAG, "Surface became invalid before setting fixed size."); }
+                 });
 
                 previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
                 previewRequestBuilder.addTarget(surface);
@@ -727,7 +743,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (lb != null) { for (int i = 0; i < lb.length; i++) { if (lb[i] != null && !lb[i].isRecycled()) { lb[i].recycle(); Log.d(TAG, "Recycled layerBitmap[" + i + "]"); } } }
     }
 
-    // Метод resetTransformationsAndFit (ИЗМЕНЕН НА FIT_CENTER)
     private void resetTransformationsAndFit() {
         matrix.reset();
         if (originalBitmap == null || originalBitmap.isRecycled() || imageView.getWidth() == 0 || imageView.getHeight() == 0) {
@@ -738,10 +753,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
         final float viewWidth = imageView.getWidth(); final float viewHeight = imageView.getHeight();
         final float bmpWidth = originalBitmap.getWidth(); final float bmpHeight = originalBitmap.getHeight();
-
-        // *** ВОЗВРАЩАЕМ К FIT_CENTER ***
-        float scale = Math.min(viewWidth / bmpWidth, viewHeight / bmpHeight);
-
+        float scale = Math.min(viewWidth / bmpWidth, viewHeight / bmpHeight); // Используем fitCenter по умолчанию
         float dx = (viewWidth - bmpWidth * scale) / 2f;
         float dy = (viewHeight - bmpHeight * scale) / 2f;
         matrix.setScale(scale, scale);
@@ -804,7 +816,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         });
     }
 
-    // Метод getLayerIndex (Восстановлен)
     private int getLayerIndex(int grayValue) {
         int numLayers = PENCIL_HARDNESS.length;
         int index = (int) (((float) grayValue / 256.0f) * numLayers);
@@ -849,8 +860,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         final Dialog dialog = new Dialog(this);
         dialog.setContentView(R.layout.dialog_layer_selection);
         dialog.setTitle(R.string.layer_selection_title);
-        RecyclerView recyclerView = dialog.findViewById(R.id.layerRecyclerView); // ИСПРАВЛЕН ID
-        if (recyclerView == null) { Log.e(TAG, "RecyclerView (R.id.layerRecyclerView) not found!"); Toast.makeText(this, "Error dialog", Toast.LENGTH_SHORT).show(); return; }
+        // *** ИСПРАВЛЕНО ID ЗДЕСЬ ***
+        RecyclerView recyclerView = dialog.findViewById(R.id.recyclerView);
+        if (recyclerView == null) { Log.e(TAG, "RecyclerView (R.id.recyclerView) not found!"); Toast.makeText(this, "Error dialog", Toast.LENGTH_SHORT).show(); return; }
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         LayerAdapter adapter = new LayerAdapter(PENCIL_HARDNESS, layerVisibility, this);
         recyclerView.setAdapter(adapter);
@@ -870,16 +882,132 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     // --- Сохранение/Загрузка параметров ---
     private void checkPermissionAndSaveParameters() { openSaveFilePicker(); }
     private void checkPermissionAndLoadParameters() { openLoadFilePicker(); }
-    private void openSaveFilePicker() { /* Код из предыдущей версии */ }
-    private void openLoadFilePicker() { /* Код из предыдущей версии */ }
-    private void saveParametersToFile(Uri uri) { /* Код из предыдущей версии */ }
-    private void loadParametersFromFile(Uri uri) { /* Код из предыдущей версии */ }
-    private void applyLoadedParameters(JSONObject json) throws Exception { /* Код из предыдущей версии */ }
+    private void openSaveFilePicker() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/json");
+        intent.putExtra(Intent.EXTRA_TITLE, "camera_overlay_params.json");
+        try { saveFileLauncher.launch(intent); }
+        catch (Exception e) { Log.e(TAG, "Could not launch save file picker", e); Toast.makeText(this, "Error opening save dialog", Toast.LENGTH_SHORT).show(); }
+    }
+    private void openLoadFilePicker() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/json");
+        try { loadFileLauncher.launch(intent); }
+        catch (Exception e) { Log.e(TAG, "Could not launch load file picker", e); Toast.makeText(this, "Error opening load dialog", Toast.LENGTH_SHORT).show(); }
+    }
+    private void saveParametersToFile(Uri uri) {
+        if (originalBitmap == null || originalBitmap.isRecycled()) { Toast.makeText(this, "Load an image first to save parameters", Toast.LENGTH_SHORT).show(); return; }
+        if (uri == null) { Log.e(TAG, "Save URI is null"); return; }
+        try {
+            JSONObject json = new JSONObject();
+            if (currentImageUri != null) { json.put("imageUri", currentImageUri.toString()); }
+            JSONArray matrixArray = new JSONArray(); float[] matrixValues = new float[9]; matrix.getValues(matrixValues); for (float value : matrixValues) matrixArray.put(value);
+            json.put("matrix", matrixArray);
+            json.put("transparency", transparencySeekBar.getProgress());
+            json.put("isPencilMode", isPencilMode);
+            json.put("isImageVisible", isImageVisible);
+            json.put("controlsVisible", controlsVisibilityCheckbox.isChecked());
+            JSONArray visibilityArray = new JSONArray(); for (boolean visible : layerVisibility) visibilityArray.put(visible);
+            json.put("layerVisibility", visibilityArray);
+            ContentResolver resolver = getContentResolver();
+            try (OutputStream outputStream = resolver.openOutputStream(uri)) {
+                if (outputStream != null) { outputStream.write(json.toString(2).getBytes()); Toast.makeText(this, "Parameters saved", Toast.LENGTH_SHORT).show(); Log.d(TAG, "Parameters saved to " + uri); }
+                else { throw new IOException("OutputStream is null"); }
+            }
+        } catch (Exception e) { Log.e(TAG, "Error saving parameters to file", e); Toast.makeText(this, "Failed to save parameters", Toast.LENGTH_LONG).show(); }
+    }
+
+    private void loadParametersFromFile(Uri uri) {
+        if (uri == null) { Log.e(TAG, "Load URI is null"); return; }
+        Log.d(TAG, "Loading parameters from URI: " + uri);
+        try {
+            ContentResolver resolver = getContentResolver();
+            try (InputStream inputStream = resolver.openInputStream(uri)) {
+                if (inputStream != null) {
+                    StringBuilder jsonString = new StringBuilder(); byte[] buffer = new byte[4096]; int bytesRead;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) { jsonString.append(new String(buffer, 0, bytesRead)); }
+                    JSONObject json = new JSONObject(jsonString.toString());
+                    Uri loadedImageUri = null; if (json.has("imageUri")) { loadedImageUri = Uri.parse(json.getString("imageUri")); }
+                    if (loadedImageUri != null && !loadedImageUri.equals(currentImageUri)) {
+                        Log.d(TAG, "Loading image specified in parameters: " + loadedImageUri);
+                        currentImageUri = loadedImageUri;
+                        final JSONObject finalJson = json;
+                        loadImageAndApplyParams(currentImageUri, finalJson);
+                    } else {
+                        applyLoadedParameters(json);
+                    }
+                } else { throw new IOException("InputStream is null"); }
+            }
+        } catch (Exception e) { Log.e(TAG, "Error loading parameters from file", e); Toast.makeText(this, "Failed to load parameters", Toast.LENGTH_LONG).show(); }
+    }
+
+    private void loadImageAndApplyParams(Uri uri, JSONObject paramsToApply) {
+        if (uri == null) { return; }
+        Log.d(TAG, "Requesting image load for URI (with params): " + uri);
+        imageLoadExecutor.submit(() -> {
+            Bitmap loadedBitmap = null; InputStream inputStream = null;
+            try {
+                ContentResolver resolver = getContentResolver();
+                BitmapFactory.Options options = new BitmapFactory.Options(); options.inJustDecodeBounds = true;
+                inputStream = resolver.openInputStream(uri); BitmapFactory.decodeStream(inputStream, null, options);
+                if (inputStream != null) inputStream.close();
+                int reqWidth = 1920; int reqHeight = 1080;
+                options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight); options.inJustDecodeBounds = false;
+                inputStream = resolver.openInputStream(uri); loadedBitmap = BitmapFactory.decodeStream(inputStream, null, options);
+            } catch (Exception e) { Log.e(TAG, "Exception loading bitmap for params", e); }
+            finally { if (inputStream != null) { try { inputStream.close(); } catch (IOException e) { /* ignore */ } } }
+            final Bitmap finalBitmap = loadedBitmap;
+            runOnUiThread(() -> {
+                if (finalBitmap != null) {
+                    recycleBitmaps(); originalBitmap = finalBitmap; currentImageUri = uri;
+                    try { applyLoadedParameters(paramsToApply); }
+                    catch (Exception e) { Log.e(TAG, "Error applying loaded parameters after image load", e); Toast.makeText(this, "Error applying parameters", Toast.LENGTH_SHORT).show(); resetTransformationsAndFit(); updateImageDisplay(); }
+                } else { Toast.makeText(this, "Failed to load image specified in parameters", Toast.LENGTH_SHORT).show(); }
+            });
+        });
+    }
+
+    private void applyLoadedParameters(JSONObject json) throws Exception {
+        Log.d(TAG, "Applying loaded parameters...");
+        if (json.has("matrix")) {
+            JSONArray matrixArray = json.getJSONArray("matrix");
+            if (matrixArray.length() >= 9) {
+                float[] matrixValues = new float[9];
+                for (int i = 0; i < 9; i++) matrixValues[i] = (float) matrixArray.getDouble(i);
+                matrix.setValues(matrixValues);
+                scaleFactor = getMatrixScale(matrix); // Восстанавливаем масштаб из матрицы
+            }
+        } else { matrix.reset(); scaleFactor = 1.0f; }
+
+        if (json.has("transparency")) transparencySeekBar.setProgress(json.getInt("transparency"));
+        if (json.has("isPencilMode")) isPencilMode = json.getBoolean("isPencilMode");
+        if (json.has("isImageVisible")) isImageVisible = json.getBoolean("isImageVisible");
+        boolean controlsVisible = true; if (json.has("controlsVisible")) controlsVisible = json.getBoolean("controlsVisible");
+
+        if (json.has("layerVisibility")) {
+            JSONArray visibilityArray = json.getJSONArray("layerVisibility");
+            for (int i = 0; i < visibilityArray.length() && i < layerVisibility.length; i++) { layerVisibility[i] = visibilityArray.getBoolean(i); }
+        }
+        final boolean finalControlsVisible = controlsVisible;
+        runOnUiThread(() -> {
+            pencilModeSwitch.setChecked(isPencilMode);
+            hideImageCheckbox.setChecked(!isImageVisible);
+            controlsVisibilityCheckbox.setChecked(finalControlsVisible);
+            updateControlsVisibility(finalControlsVisible);
+            applyTransformations();
+             if (isPencilMode && originalBitmap != null && !originalBitmap.isRecycled()) { imageLoadExecutor.submit(this::processPencilEffect); }
+             else { updateImageDisplay(); }
+            Toast.makeText(this, "Parameters applied", Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "Parameters applied successfully.");
+        });
+    }
 
     // --- Жизненный цикл Activity ---
     @Override
     protected void onResume() {
-        super.onResume(); // *** ИСПРАВЛЕНО: Вызов super ДОЛЖЕН быть первым ***
+        super.onResume();
         Log.d(TAG, "onResume");
         hideSystemUI();
         startBackgroundThread();
@@ -893,7 +1021,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onPause() {
         Log.d(TAG, "onPause");
         closeCamera();
-        super.onPause(); // Вызов super в конце
+        super.onPause();
     }
     @Override
     protected void onDestroy() {
@@ -902,11 +1030,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         cameraExecutor.shutdown();
         imageLoadExecutor.shutdown();
         recycleBitmaps();
-        super.onDestroy(); // Вызов super в конце
+        super.onDestroy();
     }
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState); // Вызов super в начале
+        super.onSaveInstanceState(outState);
         Log.d(TAG, "Saving instance state...");
         if (currentImageUri != null) { outState.putString(KEY_IMAGE_URI, currentImageUri.toString()); }
         if (originalBitmap != null) { float[] matrixValues = new float[9]; matrix.getValues(matrixValues); outState.putFloatArray(KEY_MATRIX_VALUES, matrixValues); }
@@ -926,7 +1054,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
              Log.d(TAG, "Restored Image URI: " + currentImageUri);
         }
         float[] savedMatrixValues = savedInstanceState.getFloatArray(KEY_MATRIX_VALUES);
-        if (savedMatrixValues != null) { matrix.setValues(savedMatrixValues); scaleFactor = getMatrixScale(matrix); Log.d(TAG, "Restored Matrix, Scale"); }
+        if (savedMatrixValues != null) {
+            matrix.setValues(savedMatrixValues);
+            scaleFactor = getMatrixScale(matrix);
+            Log.d(TAG, "Restored Matrix, Scale");
+        }
         isPencilMode = savedInstanceState.getBoolean(KEY_PENCIL_MODE, false);
         boolean[] savedLayerVisibility = savedInstanceState.getBooleanArray(KEY_LAYER_VISIBILITY);
         if (savedLayerVisibility != null && savedLayerVisibility.length == layerVisibility.length) { System.arraycopy(savedLayerVisibility, 0, layerVisibility, 0, layerVisibility.length); }
@@ -954,7 +1086,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 case MotionEvent.ACTION_DOWN: savedMatrix.set(matrix); startDragPoint.set(event.getX(), event.getY()); touchMode = DRAG; Log.d(TAG, "Touch Mode: DRAG"); break;
                 case MotionEvent.ACTION_POINTER_DOWN: if (pointerCount >= 2) { savedMatrix.set(matrix); initialAngle = rotation(event); midPoint(midPoint, event); touchMode = ZOOM; Log.d(TAG, "Touch Mode: ZOOM/ROTATE"); } break;
                 case MotionEvent.ACTION_MOVE:
-                    if (touchMode == DRAG && !scaleGestureDetector.isInProgress()) { matrix.set(savedMatrix); float dx = event.getX() - startDragPoint.x; float dy = event.getY() - startDragPoint.y; matrix.postTranslate(dx, dy); applyTransformations(); }
+                    if (touchMode == DRAG && pointerCount == 1 && !scaleGestureDetector.isInProgress()) { matrix.set(savedMatrix); float dx = event.getX() - startDragPoint.x; float dy = event.getY() - startDragPoint.y; matrix.postTranslate(dx, dy); applyTransformations(); }
                     else if (touchMode == ZOOM && pointerCount >= 2) { float currentAngle = rotation(event); float deltaAngle = currentAngle - initialAngle; float initialScaleFactor = getMatrixScale(savedMatrix); float scaleChange = (initialScaleFactor > 0.001f) ? scaleFactor / initialScaleFactor : 1f; matrix.set(savedMatrix); midPoint(midPoint, event); matrix.postScale(scaleChange, scaleChange, midPoint.x, midPoint.y); matrix.postRotate(deltaAngle, midPoint.x, midPoint.y); applyTransformations(); }
                     break;
                 case MotionEvent.ACTION_POINTER_UP: if (pointerCount == 2) { int remainingPointerIndex = (event.getActionIndex() == 0) ? 1 : 0; startDragPoint.set(event.getX(remainingPointerIndex), event.getY(remainingPointerIndex)); savedMatrix.set(matrix); touchMode = DRAG; Log.d(TAG, "Touch Mode changed to DRAG after POINTER_UP"); } else if (pointerCount < 2) { touchMode = NONE; Log.d(TAG, "Touch Mode: NONE (Pointer Up)"); } break;
@@ -964,16 +1096,25 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
         private void midPoint(PointF point, MotionEvent event) { if (event.getPointerCount() < 2) { point.set(event.getX(), event.getY()); return; } float x = event.getX(0) + event.getX(1); float y = event.getY(0) + event.getY(1); point.set(x / 2f, y / 2f); }
         private float rotation(MotionEvent event) { if (event.getPointerCount() < 2) return 0f; double delta_x = (event.getX(0) - event.getX(1)); double delta_y = (event.getY(0) - event.getY(1)); return (float) Math.toDegrees(Math.atan2(delta_y, delta_x)); }
-        private float getMatrixScale(Matrix mat) { float[] values = new float[9]; mat.getValues(values); float scaleX = values[Matrix.MSCALE_X]; float skewY = values[Matrix.MSKEW_Y]; return (float) Math.sqrt(scaleX * scaleX + skewY * skewY); }
+        // getMatrixScale удален отсюда
     }
 
     private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
         @Override public boolean onScaleBegin(@NonNull ScaleGestureDetector detector) { if (originalBitmap == null || originalBitmap.isRecycled()) return false; touchMode = ZOOM; return true; }
         @Override public boolean onScale(@NonNull ScaleGestureDetector detector) { if (originalBitmap == null || touchMode != ZOOM) return false; scaleFactor *= detector.getScaleFactor(); scaleFactor = Math.max(0.1f, Math.min(scaleFactor, 10.0f)); return true; }
-        // getMatrixScale не нужен здесь
+        // getMatrixScale удален отсюда
     }
 
-    // --- Вспомогательный метод для получения Display ---
+    // --- Вспомогательные методы ---
+
+    // Метод getMatrixScale (ПЕРЕМЕЩЕН ИЗ TouchAndGestureListener)
+    private float getMatrixScale(Matrix mat) {
+        float[] values = new float[9]; mat.getValues(values);
+        float scaleX = values[Matrix.MSCALE_X]; float skewY = values[Matrix.MSKEW_Y];
+        // Используем более точный расчет масштаба, учитывая возможный поворот/наклон
+        return (float) Math.sqrt(scaleX * scaleX + skewY * skewY);
+    }
+
     public Display getDisplay() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             DisplayManager displayManager = (DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
