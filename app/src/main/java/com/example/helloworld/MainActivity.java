@@ -76,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
     private Handler backgroundHandler;
     private final Semaphore cameraOpenCloseLock = new Semaphore(1);
     private boolean isSurfaceAvailable = false;
-    private boolean isCameraPendingOpen = false; // Флаг для отложенного открытия камеры
+    private boolean isCameraPendingOpen = false;
 
     private Bitmap originalBitmap;
     private Bitmap pencilBitmap;
@@ -159,6 +159,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed: " + width + "x" + height);
+                adjustSurfaceViewAspectRatio(width, height);
                 if (cameraDevice != null && isSurfaceAvailable) {
                     closeCameraPreviewSession();
                     previewSize = chooseOptimalPreviewSize(getPreviewSizes(), width, height);
@@ -235,6 +236,33 @@ public class MainActivity extends AppCompatActivity {
                 ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_STORAGE_PERMISSION);
         }
+    }
+
+    private void adjustSurfaceViewAspectRatio(int width, int height) {
+        if (previewSize == null) {
+            return;
+        }
+
+        float previewRatio = (float) previewSize.getWidth() / previewSize.getHeight();
+        float viewRatio = (float) width / height;
+
+        int newWidth, newHeight;
+        if (previewRatio > viewRatio) {
+            // Подгоняем по ширине, высота подстраивается
+            newWidth = width;
+            newHeight = (int) (width / previewRatio);
+        } else {
+            // Подгоняем по высоте, ширина подстраивается
+            newHeight = height;
+            newWidth = (int) (height * previewRatio);
+        }
+
+        ViewGroup.LayoutParams params = cameraSurfaceView.getLayoutParams();
+        params.width = newWidth;
+        params.height = newHeight;
+        cameraSurfaceView.setLayoutParams(params);
+        cameraSurfaceView.requestLayout();
+        Log.d(TAG, "Adjusted SurfaceView to " + newWidth + "x" + newHeight + " (preview ratio: " + previewRatio + ")");
     }
 
     @Override
@@ -367,12 +395,16 @@ public class MainActivity extends AppCompatActivity {
 
         Size optimalSize = null;
         double minDiff = Double.MAX_VALUE;
+        int maxArea = 0;
 
         for (Size size : choices) {
             double ratio = (double) size.getWidth() / size.getHeight();
-            if (Math.abs(ratio - targetRatio) < minDiff) {
+            int area = size.getWidth() * size.getHeight();
+            double ratioDiff = Math.abs(ratio - targetRatio);
+            if (ratioDiff < minDiff || (ratioDiff == minDiff && area > maxArea)) {
                 optimalSize = size;
-                minDiff = Math.abs(ratio - targetRatio);
+                minDiff = ratioDiff;
+                maxArea = area;
             }
         }
 
