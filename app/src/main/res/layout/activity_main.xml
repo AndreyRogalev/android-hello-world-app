@@ -3,21 +3,18 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- SurfaceView для предпросмотра камеры -->
     <SurfaceView
         android:id="@+id/cameraSurfaceView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_centerInParent="true" />
 
-    <!-- ImageView для наложения изображения -->
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_centerInParent="true" />
 
-    <!-- Элементы управления -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -36,51 +33,51 @@
             android:id="@+id/pickImageButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Pick Image" />
+            android:text="@string/pick_image" />
 
         <Switch
             android:id="@+id/pencilModeSwitch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Pencil Mode" />
+            android:text="@string/pencil_mode" />
 
         <Button
             android:id="@+id/layerSelectButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Select Layer"
+            android:text="@string/select_layers"
             android:visibility="gone" />
 
         <CheckBox
             android:id="@+id/controlsVisibilityCheckbox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Show Controls"
+            android:text="@string/show_controls"
             android:checked="true" />
 
         <CheckBox
             android:id="@+id/hideImageCheckbox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Hide Image" />
+            android:text="@string/hide_image" />
 
         <Button
             android:id="@+id/saveParametersButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Save Parameters" />
+            android:text="@string/save_parameters" />
 
         <Button
             android:id="@+id/loadParametersButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Load Parameters" />
+            android:text="@string/load_parameters" />
 
         <Button
             android:id="@+id/switchCameraButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Switch Camera" />
+            android:text="@string/switch_camera" />
     </LinearLayout>
 
 </RelativeLayout>

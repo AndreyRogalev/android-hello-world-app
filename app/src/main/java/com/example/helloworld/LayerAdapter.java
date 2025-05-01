@@ -5,40 +5,39 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-public class LayerAdapter extends RecyclerView.Adapter<LayerAdapter.LayerViewHolder> {
+public class LayerAdapter extends RecyclerView.Adapter<LayerAdapter.ViewHolder> {
 
-    private final String[] pencilHardness;
-    private final boolean[] layerVisibility;
+    private final String[] layers;
+    private final boolean[] visibility;
     private final OnLayerVisibilityChangedListener listener;
 
     public interface OnLayerVisibilityChangedListener {
         void onLayerVisibilityChanged(int position, boolean isVisible);
     }
 
-    public LayerAdapter(String[] pencilHardness, boolean[] layerVisibility, OnLayerVisibilityChangedListener listener) {
-        this.pencilHardness = pencilHardness;
-        this.layerVisibility = layerVisibility;
+    public LayerAdapter(String[] layers, boolean[] visibility, OnLayerVisibilityChangedListener listener) {
+        this.layers = layers;
+        this.visibility = visibility;
         this.listener = listener;
     }
 
     @NonNull
     @Override
-    public LayerViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_layer, parent, false);
-        return new LayerViewHolder(view);
+                .inflate(android.R.layout.simple_list_item_2, parent, false);
+        return new ViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull LayerViewHolder holder, int position) {
-        holder.layerText.setText(pencilHardness[position]);
-        holder.layerCheckBox.setChecked(layerVisibility[position]);
-        holder.layerCheckBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            layerVisibility[position] = isChecked;
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        holder.text1.setText(layers[position]);
+        holder.checkBox.setChecked(visibility[position]);
+        holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            visibility[position] = isChecked;
             if (listener != null) {
                 listener.onLayerVisibilityChanged(position, isChecked);
             }
@@ -47,17 +46,19 @@ public class LayerAdapter extends RecyclerView.Adapter<LayerAdapter.LayerViewHol
 
     @Override
     public int getItemCount() {
-        return pencilHardness.length;
+        return layers.length;
     }
 
-    static class LayerViewHolder extends RecyclerView.ViewHolder {
-        TextView layerText;
-        CheckBox layerCheckBox;
+    static class ViewHolder extends RecyclerView.ViewHolder {
+        TextView text1;
+        CheckBox checkBox;
 
-        LayerViewHolder(@NonNull View itemView) {
+        ViewHolder(View itemView) {
             super(itemView);
-            layerText = itemView.findViewById(R.id.layerText);
-            layerCheckBox = itemView.findViewById(R.id.layerCheckBox);
+            text1 = itemView.findViewById(android.R.id.text1);
+            checkBox = new CheckBox(itemView.getContext());
+            ViewGroup parent = (ViewGroup) text1.getParent();
+            parent.addView(checkBox);
         }
     }
 }

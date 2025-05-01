@@ -1,35 +1,19 @@
-# Generated files
-*.apk
-*.ap_
-*.aab
-*.dex
-*.class
-
-# Gradle files
+# Gradle файлы
 .gradle/
 build/
 */build/
 
-# Local configuration files (editors, OS, etc)
+# Локальные настройки
+local.properties
+
+# Сгенерированные файлы
+*.apk
+*.ap_
+*.aab
+
+# Кэш и временные файлы
 .idea/
 *.iml
-local.properties
-.DS_Store
 
-# Keystore files
-*.jks
-*.keystore
-
-# Log files
+# Логи
 *.log
-build_log.txt
-
-# Other potentially generated files/dirs
-captures/
-.externalNativeBuild/
-output.json
-*out* # Be careful with broad patterns if you have source files ending in 'out'
-
-# Added based on your untracked files
-nvim-linux64.tar.gz
-nvim-linux64/

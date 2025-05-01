@@ -1,6 +1,7 @@
 package com.example.helloworld;
 
 import android.Manifest;
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -41,6 +42,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -49,7 +52,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLayerVisibilityChangedListener {
 
     private static final String TAG = "MainActivity";
     private static final int REQUEST_CAMERA_PERMISSION = 100;
@@ -92,6 +95,14 @@ public class MainActivity extends AppCompatActivity {
     private ScaleGestureDetector scaleGestureDetector;
     private float lastTouchX, lastTouchY;
     private boolean isDragging = false;
+
+    private String[] cameraIds;
+    private int currentCameraIndex = 0;
+
+    private static final String[] PENCIL_HARDNESS = {
+            "9H", "8H", "7H", "6H", "5H", "4H", "3H", "2H", "H", "F",
+            "HB", "B", "2B", "3B", "4B", "5B", "6B", "7B", "8B", "9B"
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -201,9 +212,7 @@ public class MainActivity extends AppCompatActivity {
             updateImageDisplay();
         });
 
-        layerSelectButton.setOnClickListener(v -> {
-            Toast.makeText(MainActivity.this, "Layer selection not implemented", Toast.LENGTH_SHORT).show();
-        });
+        layerSelectButton.setOnClickListener(v -> showLayerSelectionDialog());
 
         controlsVisibilityCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
             int visibility = isChecked ? View.VISIBLE : View.GONE;
@@ -238,6 +247,22 @@ public class MainActivity extends AppCompatActivity {
                 ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_STORAGE_PERMISSION);
         }
+
+        // Инициализация списка камер
+        CameraManager manager = (CameraManager) getSystemService(CAMERA_SERVICE);
+        try {
+            cameraIds = manager.getCameraIdList();
+            if (cameraIds.length > 0) {
+                cameraId = cameraIds[0];
+            }
+        } catch (CameraAccessException e) {
+            Log.e(TAG, "Error accessing camera list", e);
+            Toast.makeText(this, "Cannot access cameras", Toast.LENGTH_LONG).show();
+        }
+
+        // Инициализация layerVisibility
+        layerVisibility = new boolean[20];
+        Arrays.fill(layerVisibility, true);
     }
 
     private void adjustSurfaceViewAspectRatioWithCropping(int width, int height) {
@@ -250,30 +275,25 @@ public class MainActivity extends AppCompatActivity {
 
         int newWidth, newHeight;
         if (previewRatio > viewRatio) {
-            // Обрезаем по высоте, чтобы заполнить экран по ширине
             newWidth = width;
             newHeight = (int) (width / previewRatio);
         } else {
-            // Обрезаем по ширине, чтобы заполнить экран по высоте
             newHeight = height;
             newWidth = (int) (height * previewRatio);
         }
 
-        // Масштабируем SurfaceView так, чтобы он заполнил весь экран с обрезкой
         ViewGroup.LayoutParams params = cameraSurfaceView.getLayoutParams();
         params.width = width;
         params.height = height;
         cameraSurfaceView.setLayoutParams(params);
 
-        // Применяем масштабирование для обрезки краёв
         float scaleX = (float) width / newWidth;
         float scaleY = (float) height / newHeight;
-        float scale = Math.max(scaleX, scaleY); // Выбираем больший масштаб для обрезки
+        float scale = Math.max(scaleX, scaleY);
 
         cameraSurfaceView.setScaleX(scale);
         cameraSurfaceView.setScaleY(scale);
 
-        // Центрируем изображение
         cameraSurfaceView.setPivotX(width / 2f);
         cameraSurfaceView.setPivotY(height / 2f);
 
@@ -336,7 +356,7 @@ public class MainActivity extends AppCompatActivity {
         CameraManager manager = (CameraManager) getSystemService(CAMERA_SERVICE);
         try {
             if (cameraId == null) {
-                cameraId = manager.getCameraIdList()[0]; // По умолчанию задняя камера
+                cameraId = manager.getCameraIdList()[0];
             }
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
             Size[] previewSizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
@@ -411,7 +431,7 @@ public class MainActivity extends AppCompatActivity {
         if (viewWidth > 0 && viewHeight > 0) {
             targetRatio = (double) viewWidth / viewHeight;
         } else {
-            targetRatio = 4.0 / 3.0; // Соотношение по умолчанию
+            targetRatio = 4.0 / 3.0;
         }
 
         Size optimalSize = null;
@@ -512,16 +532,14 @@ public class MainActivity extends AppCompatActivity {
         CameraManager manager = (CameraManager) getSystemService(CAMERA_SERVICE);
         try {
             closeCamera();
-            String[] cameraIds = manager.getCameraIdList();
-            int currentCameraIndex = Arrays.asList(cameraIds).indexOf(cameraId);
-            int nextCameraIndex = (currentCameraIndex + 1) % cameraIds.length;
-            cameraId = cameraIds[nextCameraIndex];
+            currentCameraIndex = (currentCameraIndex + 1) % cameraIds.length;
+            cameraId = cameraIds[currentCameraIndex];
             if (isSurfaceAvailable && !isCameraOpen) {
                 openCamera();
             } else {
                 isCameraPendingOpen = true;
             }
-        } catch (CameraAccessException e) {
+        } catch (Exception e) {
             Log.e(TAG, "Error switching camera", e);
             Toast.makeText(this, "Error switching camera", Toast.LENGTH_LONG).show();
         }
@@ -696,7 +714,6 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            Bitmap resultBitmap = Bitmap.createBitmap(originalBitmap
             Bitmap resultBitmap = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
             if (resultBitmap == null) {
                 Log.d(TAG, "updateImageDisplay: Failed to create resultBitmap");
@@ -733,6 +750,25 @@ public class MainActivity extends AppCompatActivity {
             });
             Log.d(TAG, "updateImageDisplay: Original bitmap displayed");
         }
+    }
+
+    private void showLayerSelectionDialog() {
+        Dialog dialog = new Dialog(this);
+        dialog.setContentView(R.layout.dialog_layer_selection);
+        dialog.setTitle(R.string.layer_selection_title);
+
+        RecyclerView recyclerView = dialog.findViewById(R.id.layerRecyclerView);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        LayerAdapter adapter = new LayerAdapter(PENCIL_HARDNESS, layerVisibility, this);
+        recyclerView.setAdapter(adapter);
+
+        dialog.show();
+    }
+
+    @Override
+    public void onLayerVisibilityChanged(int position, boolean isVisible) {
+        layerVisibility[position] = isVisible;
+        updateImageDisplay();
     }
 
     private void saveParameters() {
