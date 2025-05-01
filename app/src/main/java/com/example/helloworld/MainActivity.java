@@ -45,9 +45,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.Semaphore;
 
 public class MainActivity extends AppCompatActivity {
@@ -77,7 +75,8 @@ public class MainActivity extends AppCompatActivity {
     private HandlerThread backgroundThread;
     private Handler backgroundHandler;
     private final Semaphore cameraOpenCloseLock = new Semaphore(1);
-    private boolean isSurfaceAvailable = false; // Флаг для отслеживания состояния поверхности
+    private boolean isSurfaceAvailable = false;
+    private boolean isCameraPendingOpen = false; // Флаг для отложенного открытия камеры
 
     private Bitmap originalBitmap;
     private Bitmap pencilBitmap;
@@ -114,6 +113,7 @@ public class MainActivity extends AppCompatActivity {
             public boolean onScale(ScaleGestureDetector detector) {
                 scaleFactor *= detector.getScaleFactor();
                 scaleFactor = Math.max(0.1f, Math.min(scaleFactor, 5.0f));
+                matrix.postScale(detector.getScaleFactor(), detector.getScaleFactor(), detector.getFocusX(), detector.getFocusY());
                 applyTransformations();
                 return true;
             }
@@ -150,17 +150,19 @@ public class MainActivity extends AppCompatActivity {
             public void surfaceCreated(SurfaceHolder holder) {
                 Log.d(TAG, "Surface created");
                 isSurfaceAvailable = true;
-                openCamera(); // Открываем камеру, когда поверхность готова
+                if (isCameraPendingOpen) {
+                    openCamera();
+                    isCameraPendingOpen = false;
+                }
             }
 
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                 Log.d(TAG, "Surface changed: " + width + "x" + height);
-                // Обновляем размер предпросмотра и пересоздаём сессию
                 if (cameraDevice != null && isSurfaceAvailable) {
-                    closeCameraPreviewSession(); // Закрываем старую сессию
+                    closeCameraPreviewSession();
                     previewSize = chooseOptimalPreviewSize(getPreviewSizes(), width, height);
-                    createCameraPreviewSession(); // Создаём новую сессию
+                    createCameraPreviewSession();
                 }
             }
 
@@ -168,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
             public void surfaceDestroyed(SurfaceHolder holder) {
                 Log.d(TAG, "Surface destroyed");
                 isSurfaceAvailable = false;
-                closeCamera(); // Закрываем камеру при уничтожении поверхности
+                closeCamera();
             }
         });
 
@@ -190,6 +192,9 @@ public class MainActivity extends AppCompatActivity {
         pencilModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isPencilMode = isChecked;
             layerSelectButton.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+            if (isPencilMode) {
+                processPencilEffect();
+            }
             updateImageDisplay();
         });
 
@@ -222,6 +227,8 @@ public class MainActivity extends AppCompatActivity {
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
+        } else {
+            isCameraPendingOpen = true;
         }
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
@@ -237,6 +244,8 @@ public class MainActivity extends AppCompatActivity {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 if (isSurfaceAvailable) {
                     openCamera();
+                } else {
+                    isCameraPendingOpen = true;
                 }
             } else {
                 Toast.makeText(this, "Camera permission is required", Toast.LENGTH_LONG).show();
@@ -274,7 +283,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void openCamera() {
         if (!isSurfaceAvailable) {
-            Log.d(TAG, "Surface not available, skipping openCamera");
+            Log.d(TAG, "Surface not available, setting pending open");
+            isCameraPendingOpen = true;
             return;
         }
 
@@ -338,17 +348,23 @@ public class MainActivity extends AppCompatActivity {
                     .getOutputSizes(SurfaceHolder.class);
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error getting preview sizes", e);
-            return new Size[]{};
+            return new Size[]{new Size(1280, 720)};
         }
     }
 
     private Size chooseOptimalPreviewSize(Size[] choices, int viewWidth, int viewHeight) {
         if (choices == null || choices.length == 0) {
-            Log.e(TAG, "No preview sizes available");
-            return new Size(1280, 720); // Запасной размер
+            Log.e(TAG, "No preview sizes available, using default");
+            return new Size(1280, 720);
         }
 
-        double targetRatio = (double) viewWidth / viewHeight;
+        double targetRatio;
+        if (viewWidth > 0 && viewHeight > 0) {
+            targetRatio = (double) viewWidth / viewHeight;
+        } else {
+            targetRatio = 4.0 / 3.0; // Соотношение по умолчанию
+        }
+
         Size optimalSize = null;
         double minDiff = Double.MAX_VALUE;
 
@@ -397,6 +413,7 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                         cameraCaptureSession.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler);
+                        Log.d(TAG, "Camera preview session started");
                     } catch (CameraAccessException e) {
                         Log.e(TAG, "Error setting up camera preview", e);
                     }
@@ -445,6 +462,8 @@ public class MainActivity extends AppCompatActivity {
             cameraId = cameraIds[nextCameraIndex];
             if (isSurfaceAvailable) {
                 openCamera();
+            } else {
+                isCameraPendingOpen = true;
             }
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error switching camera", e);
@@ -470,6 +489,9 @@ public class MainActivity extends AppCompatActivity {
                 resetTransformationsAndFit();
                 layerVisibility = new boolean[20];
                 Arrays.fill(layerVisibility, true);
+                if (isPencilMode) {
+                    processPencilEffect();
+                }
                 updateImageDisplay();
             } catch (IOException e) {
                 Log.e(TAG, "Error loading image", e);
@@ -483,7 +505,7 @@ public class MainActivity extends AppCompatActivity {
             matrix.reset();
             scaleFactor = 1.0f;
             rotationAngle = 0.0f;
-            if (imageView != null) imageView.setImageMatrix(matrix);
+            imageView.setImageMatrix(matrix);
             return;
         }
 
@@ -517,15 +539,20 @@ public class MainActivity extends AppCompatActivity {
     private void applyTransformations() {
         imageView.setImageMatrix(matrix);
         imageView.invalidate();
+        Log.d(TAG, "Transformations applied: scale=" + scaleFactor);
     }
 
     private void setImageAlpha(int progress) {
         float alpha = progress / 100.0f;
         imageView.setAlpha(alpha);
+        imageView.invalidate();
+        Log.d(TAG, "Image alpha set to: " + alpha);
     }
 
     private void processPencilEffect() {
+        Log.d(TAG, "Processing pencil effect");
         if (originalBitmap == null) {
+            Log.d(TAG, "Original bitmap is null, cannot process pencil effect");
             return;
         }
 
@@ -576,6 +603,7 @@ public class MainActivity extends AppCompatActivity {
                     layerBitmaps[layerIndex].setPixel(i % originalBitmap.getWidth(), i / originalBitmap.getWidth(), pixels[i]);
                 }
             }
+            Log.d(TAG, "Pencil effect processed successfully");
         } catch (OutOfMemoryError e) {
             Log.e(TAG, "OutOfMemoryError in processPencilEffect", e);
             Toast.makeText(this, "Not enough memory for pencil effect", Toast.LENGTH_LONG).show();
@@ -721,8 +749,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (isSurfaceAvailable) {
+        if (isSurfaceAvailable && !isCameraPendingOpen) {
             openCamera();
+        } else {
+            isCameraPendingOpen = true;
         }
     }
 
