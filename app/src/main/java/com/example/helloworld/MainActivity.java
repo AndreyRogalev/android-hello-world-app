@@ -434,7 +434,8 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
                     isCameraOpen = false;
                 }
 
-                @Override Rehabilpublic void onError(@NonNull CameraDevice camera, int error) {
+                @Override
+                public void onError(@NonNull CameraDevice camera, int error) {
                     cameraOpenCloseLock.release();
                     camera.close();
                     cameraDevice = null;
