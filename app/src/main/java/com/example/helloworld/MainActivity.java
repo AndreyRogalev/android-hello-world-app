@@ -28,6 +28,7 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+import android.view.SurfaceView; // Добавляем импорт
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
