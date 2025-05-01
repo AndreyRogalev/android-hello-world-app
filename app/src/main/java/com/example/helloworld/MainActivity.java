@@ -28,7 +28,7 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.Surface;
 import android.view.SurfaceHolder;
-import android.view.SurfaceView; // Добавляем импорт
+import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -77,6 +77,7 @@ public class MainActivity extends AppCompatActivity {
     private HandlerThread backgroundThread;
     private Handler backgroundHandler;
     private final Semaphore cameraOpenCloseLock = new Semaphore(1);
+    private boolean isSurfaceAvailable = false; // Флаг для отслеживания состояния поверхности
 
     private Bitmap originalBitmap;
     private Bitmap pencilBitmap;
@@ -147,17 +148,27 @@ public class MainActivity extends AppCompatActivity {
         cameraSurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(SurfaceHolder holder) {
-                openCamera();
+                Log.d(TAG, "Surface created");
+                isSurfaceAvailable = true;
+                openCamera(); // Открываем камеру, когда поверхность готова
             }
 
             @Override
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-                // Поверхность изменилась, можно обновить предпросмотр
+                Log.d(TAG, "Surface changed: " + width + "x" + height);
+                // Обновляем размер предпросмотра и пересоздаём сессию
+                if (cameraDevice != null && isSurfaceAvailable) {
+                    closeCameraPreviewSession(); // Закрываем старую сессию
+                    previewSize = chooseOptimalPreviewSize(getPreviewSizes(), width, height);
+                    createCameraPreviewSession(); // Создаём новую сессию
+                }
             }
 
             @Override
             public void surfaceDestroyed(SurfaceHolder holder) {
-                closeCamera();
+                Log.d(TAG, "Surface destroyed");
+                isSurfaceAvailable = false;
+                closeCamera(); // Закрываем камеру при уничтожении поверхности
             }
         });
 
@@ -183,7 +194,6 @@ public class MainActivity extends AppCompatActivity {
         });
 
         layerSelectButton.setOnClickListener(v -> {
-            // Здесь должен быть код для выбора слоёв
             Toast.makeText(MainActivity.this, "Layer selection not implemented", Toast.LENGTH_SHORT).show();
         });
 
@@ -212,8 +222,6 @@ public class MainActivity extends AppCompatActivity {
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
-        } else {
-            openCamera();
         }
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
@@ -227,7 +235,9 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                openCamera();
+                if (isSurfaceAvailable) {
+                    openCamera();
+                }
             } else {
                 Toast.makeText(this, "Camera permission is required", Toast.LENGTH_LONG).show();
                 finish();
@@ -242,9 +252,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startBackgroundThread() {
-        backgroundThread = new HandlerThread("CameraBackground");
-        backgroundThread.start();
-        backgroundHandler = new Handler(backgroundThread.getLooper());
+        if (backgroundThread == null) {
+            backgroundThread = new HandlerThread("CameraBackground");
+            backgroundThread.start();
+            backgroundHandler = new Handler(backgroundThread.getLooper());
+        }
     }
 
     private void stopBackgroundThread() {
@@ -261,10 +273,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openCamera() {
+        if (!isSurfaceAvailable) {
+            Log.d(TAG, "Surface not available, skipping openCamera");
+            return;
+        }
+
         startBackgroundThread();
         CameraManager manager = (CameraManager) getSystemService(CAMERA_SERVICE);
         try {
-            cameraId = manager.getCameraIdList()[0]; // По умолчанию задняя камера
+            if (cameraId == null) {
+                cameraId = manager.getCameraIdList()[0]; // По умолчанию задняя камера
+            }
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
             Size[] previewSizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                     .getOutputSizes(SurfaceHolder.class);
@@ -273,21 +292,30 @@ public class MainActivity extends AppCompatActivity {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 return;
             }
+            cameraOpenCloseLock.acquire();
             manager.openCamera(cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice camera) {
                     cameraDevice = camera;
-                    createCameraPreviewSession();
+                    if (isSurfaceAvailable) {
+                        createCameraPreviewSession();
+                    } else {
+                        Log.d(TAG, "Surface not available after camera opened, closing camera");
+                        closeCamera();
+                    }
+                    cameraOpenCloseLock.release();
                 }
 
                 @Override
                 public void onDisconnected(@NonNull CameraDevice camera) {
+                    cameraOpenCloseLock.release();
                     camera.close();
                     cameraDevice = null;
                 }
 
                 @Override
                 public void onError(@NonNull CameraDevice camera, int error) {
+                    cameraOpenCloseLock.release();
                     camera.close();
                     cameraDevice = null;
                     Toast.makeText(MainActivity.this, "Camera error: " + error, Toast.LENGTH_LONG).show();
@@ -296,14 +324,31 @@ public class MainActivity extends AppCompatActivity {
         } catch (CameraAccessException e) {
             Log.e(TAG, "Cannot access camera", e);
             Toast.makeText(this, "Cannot access camera", Toast.LENGTH_LONG).show();
+        } catch (InterruptedException e) {
+            Log.e(TAG, "Interrupted while opening camera", e);
+            cameraOpenCloseLock.release();
+        }
+    }
+
+    private Size[] getPreviewSizes() {
+        try {
+            CameraManager manager = (CameraManager) getSystemService(CAMERA_SERVICE);
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+            return characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                    .getOutputSizes(SurfaceHolder.class);
+        } catch (CameraAccessException e) {
+            Log.e(TAG, "Error getting preview sizes", e);
+            return new Size[]{};
         }
     }
 
     private Size chooseOptimalPreviewSize(Size[] choices, int viewWidth, int viewHeight) {
-        // Определяем целевое соотношение сторон на основе размеров SurfaceView
-        double targetRatio = (double) viewWidth / viewHeight;
+        if (choices == null || choices.length == 0) {
+            Log.e(TAG, "No preview sizes available");
+            return new Size(1280, 720); // Запасной размер
+        }
 
-        // Ищем размер с ближайшим соотношением сторон
+        double targetRatio = (double) viewWidth / viewHeight;
         Size optimalSize = null;
         double minDiff = Double.MAX_VALUE;
 
@@ -315,8 +360,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Если ничего не нашли, берём первый доступный размер
-        if (optimalSize == null && choices.length > 0) {
+        if (optimalSize == null) {
             optimalSize = choices[0];
         }
 
@@ -325,9 +369,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void createCameraPreviewSession() {
+        if (!isSurfaceAvailable || cameraDevice == null) {
+            Log.d(TAG, "Cannot create preview session: Surface not available or cameraDevice is null");
+            return;
+        }
+
         try {
             SurfaceHolder holder = cameraSurfaceView.getHolder();
             Surface surface = holder.getSurface();
+            if (!surface.isValid()) {
+                Log.d(TAG, "Surface is not valid, aborting preview session creation");
+                return;
+            }
 
             previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             previewRequestBuilder.addTarget(surface);
@@ -335,7 +388,9 @@ public class MainActivity extends AppCompatActivity {
             cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
-                    if (cameraDevice == null) {
+                    if (cameraDevice == null || !isSurfaceAvailable) {
+                        Log.d(TAG, "Camera device closed or surface not available during session configuration");
+                        session.close();
                         return;
                     }
                     cameraCaptureSession = session;
@@ -357,13 +412,17 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void closeCameraPreviewSession() {
+        if (cameraCaptureSession != null) {
+            cameraCaptureSession.close();
+            cameraCaptureSession = null;
+        }
+    }
+
     private void closeCamera() {
         try {
             cameraOpenCloseLock.acquire();
-            if (cameraCaptureSession != null) {
-                cameraCaptureSession.close();
-                cameraCaptureSession = null;
-            }
+            closeCameraPreviewSession();
             if (cameraDevice != null) {
                 cameraDevice.close();
                 cameraDevice = null;
@@ -384,7 +443,9 @@ public class MainActivity extends AppCompatActivity {
             int currentCameraIndex = Arrays.asList(cameraIds).indexOf(cameraId);
             int nextCameraIndex = (currentCameraIndex + 1) % cameraIds.length;
             cameraId = cameraIds[nextCameraIndex];
-            openCamera();
+            if (isSurfaceAvailable) {
+                openCamera();
+            }
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error switching camera", e);
             Toast.makeText(this, "Error switching camera", Toast.LENGTH_LONG).show();
@@ -433,7 +494,6 @@ public class MainActivity extends AppCompatActivity {
         float bmpWidth = originalBitmap.getWidth();
         float bmpHeight = originalBitmap.getHeight();
 
-        // Вычисляем масштаб, сохраняя пропорции
         float scaleX = viewWidth / bmpWidth;
         float scaleY = viewHeight / bmpHeight;
         float initialScale = Math.min(scaleX, scaleY);
@@ -524,7 +584,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private int getLayerIndex(int grayValue) {
+    private int getLayerIndex(int搞 grayValue) {
         return grayValue / (256 / 20);
     }
 
@@ -661,7 +721,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (cameraSurfaceView.getHolder().getSurface().isValid()) {
+        if (isSurfaceAvailable) {
             openCamera();
         }
     }
