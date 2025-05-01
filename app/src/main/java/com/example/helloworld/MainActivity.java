@@ -1,4 +1,3 @@
-# app/src/main/java/com/example/helloworld/MainActivity.java
 package com.example.helloworld;
 
 import android.Manifest;
@@ -7,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorMatrix;
@@ -19,6 +19,9 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.TotalCaptureResult;
+import android.media.Image;
+import android.media.ImageReader;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -46,11 +49,24 @@ import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
+import org.opencv.core.Point;
+import org.opencv.imgproc.Imgproc;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 
 public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLayerVisibilityChangedListener {
@@ -71,6 +87,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     private Button saveParametersButton;
     private Button loadParametersButton;
     private Button switchCameraButton;
+    private Button captureButton;
 
     private CameraDevice cameraDevice;
     private CameraCaptureSession cameraCaptureSession;
@@ -100,6 +117,10 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     private String[] cameraIds;
     private int currentCameraIndex = 0;
 
+    private ImageReader imageReader;
+    private static final int CAPTURE_WIDTH = 1280;
+    private static final int CAPTURE_HEIGHT = 720;
+
     private static final String[] PENCIL_HARDNESS = {
             "9H", "8H", "7H", "6H", "5H", "4H", "3H", "2H", "H", "F",
             "HB", "B", "2B", "3B", "4B", "5B", "6B", "7B", "8B", "9B"
@@ -109,6 +130,14 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // Initialize OpenCV
+        if (!OpenCVLoader.initDebug()) {
+            Log.e(TAG, "OpenCV initialization failed!");
+            Toast.makeText(this, "OpenCV initialization failed!", Toast.LENGTH_LONG).show();
+        } else {
+            Log.d(TAG, "OpenCV initialized successfully");
+        }
 
         cameraSurfaceView = findViewById(R.id.cameraSurfaceView);
         imageView = findViewById(R.id.imageView);
@@ -121,6 +150,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
         saveParametersButton = findViewById(R.id.saveParametersButton);
         loadParametersButton = findViewById(R.id.loadParametersButton);
         switchCameraButton = findViewById(R.id.switchCameraButton);
+        captureButton = findViewById(R.id.captureButton);
 
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
@@ -225,6 +255,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
             saveParametersButton.setVisibility(visibility);
             loadParametersButton.setVisibility(visibility);
             switchCameraButton.setVisibility(visibility);
+            captureButton.setVisibility(visibility);
         });
 
         hideImageCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -238,18 +269,19 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
 
         switchCameraButton.setOnClickListener(v -> switchCamera());
 
+        captureButton.setOnClickListener(v -> captureImage());
+
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
         } else {
             isCameraPendingOpen = true;
         }
 
-        if (ActivityCompat.check garçonSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
                 ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_STORAGE_PERMISSION);
         }
 
-        // Initialize camera list
         CameraManager manager = (CameraManager) getSystemService(CAMERA_SERVICE);
         try {
             cameraIds = manager.getCameraIdList();
@@ -261,7 +293,6 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
             Toast.makeText(this, "Cannot access cameras", Toast.LENGTH_LONG).show();
         }
 
-        // Initialize layerVisibility
         layerVisibility = new boolean[20];
         Arrays.fill(layerVisibility, true);
     }
@@ -272,34 +303,27 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
             return;
         }
 
-        // Calculate the aspect ratios
         float previewRatio = (float) previewSize.getWidth() / previewSize.getHeight();
         float viewRatio = (float) width / height;
 
-        // Reset any previous scaling to avoid cumulative effects
         cameraSurfaceView.setScaleX(1.0f);
         cameraSurfaceView.setScaleY(1.0f);
 
         float scaleX, scaleY;
         if (previewRatio > viewRatio) {
-            // Preview is wider than the view: scale to fit height, crop width
             scaleY = 1.0f;
             scaleX = previewRatio / viewRatio;
         } else {
-            // Preview is taller than the view: scale to fit width, crop height
             scaleX = 1.0f;
             scaleY = viewRatio / previewRatio;
         }
 
-        // Apply the scaling to the SurfaceView
         cameraSurfaceView.setScaleX(scaleX);
         cameraSurfaceView.setScaleY(scaleY);
 
-        // Set the pivot point to the center of the SurfaceView for scaling
         cameraSurfaceView.setPivotX(width / 2f);
         cameraSurfaceView.setPivotY(height / 2f);
 
-        // Ensure the SurfaceView dimensions match the view's dimensions
         ViewGroup.LayoutParams params = cameraSurfaceView.getLayoutParams();
         params.width = width;
         params.height = height;
@@ -372,6 +396,18 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
                     .getOutputSizes(SurfaceHolder.class);
             previewSize = chooseOptimalPreviewSize(previewSizes, cameraSurfaceView.getWidth(), cameraSurfaceView.getHeight());
 
+            imageReader = ImageReader.newInstance(CAPTURE_WIDTH, CAPTURE_HEIGHT, android.graphics.ImageFormat.JPEG, 2);
+            imageReader.setOnImageAvailableListener(reader -> {
+                Image image = reader.acquireLatestImage();
+                if (image != null) {
+                    Bitmap bitmap = imageToBitmap(image);
+                    image.close();
+                    if (bitmap != null) {
+                        processCapturedImage(bitmap);
+                    }
+                }
+            }, backgroundHandler);
+
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 return;
             }
@@ -398,8 +434,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
                     isCameraOpen = false;
                 }
 
-                @Override
-                public void onError(@NonNull CameraDevice camera, int error) {
+                @Override Rehabilpublic void onError(@NonNull CameraDevice camera, int error) {
                     cameraOpenCloseLock.release();
                     camera.close();
                     cameraDevice = null;
@@ -436,19 +471,16 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
             return new Size(1280, 720);
         }
 
-        // Calculate the target aspect ratio based on the view dimensions
         double targetRatio = (viewWidth > 0 && viewHeight > 0) ? (double) viewWidth / viewHeight : 4.0 / 3.0;
 
         Size optimalSize = null;
         double minDiff = Double.MAX_VALUE;
         int maxArea = 0;
 
-        // Find the preview size with the closest aspect ratio to the view
         for (Size size : choices) {
             double ratio = (double) size.getWidth() / size.getHeight();
             int area = size.getWidth() * size.getHeight();
             double ratioDiff = Math.abs(ratio - targetRatio);
-            // Prioritize sizes with matching aspect ratios, then larger areas
             if (ratioDiff < minDiff || (ratioDiff == minDiff && area > maxArea)) {
                 optimalSize = size;
                 minDiff = ratioDiff;
@@ -482,7 +514,11 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
             previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             previewRequestBuilder.addTarget(surface);
 
-            cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
+            List<Surface> surfaces = new ArrayList<>();
+            surfaces.add(surface);
+            surfaces.add(imageReader.getSurface());
+
+            cameraDevice.createCaptureSession(surfaces, new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     if (cameraDevice == null || !isSurfaceAvailable || !isCameraOpen) {
@@ -527,6 +563,10 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
                 cameraDevice.close();
                 cameraDevice = null;
             }
+            if (imageReader != null) {
+                imageReader.close();
+                imageReader = null;
+            }
             isCameraOpen = false;
         } catch (InterruptedException e) {
             Log.e(TAG, "Error closing camera", e);
@@ -551,6 +591,125 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
             Log.e(TAG, "Error switching camera", e);
             Toast.makeText(this, "Error switching camera", Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void captureImage() {
+        if (cameraDevice == null || cameraCaptureSession == null) {
+            Log.e(TAG, "Cannot capture image: camera not initialized");
+            return;
+        }
+
+        try {
+            CaptureRequest.Builder captureBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            captureBuilder.addTarget(imageReader.getSurface());
+            captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+
+            cameraCaptureSession.capture(captureBuilder.build(), new CameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
+                    Log.d(TAG, "Image captured successfully");
+                }
+            }, backgroundHandler);
+        } catch (CameraAccessException e) {
+            Log.e(TAG, "Error capturing image", e);
+            Toast.makeText(this, "Error capturing image", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private Bitmap imageToBitmap(Image image) {
+        ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+        byte[] bytes = new byte[buffer.remaining()];
+        buffer.get(bytes);
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+    }
+
+    private void processCapturedImage(Bitmap bitmap) {
+        Mat mat = new Mat();
+        Utils.bitmapToMat(bitmap, mat);
+
+        Mat gray = new Mat();
+        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY);
+
+        Imgproc.GaussianBlur(gray, gray, new org.opencv.core.Size(5, 5), 0);
+
+        Mat edges = new Mat();
+        Imgproc.Canny(gray, edges, 50, 150);
+
+        List<MatOfPoint> contours = new ArrayList<>();
+        Mat hierarchy = new Mat();
+        Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+
+        MatOfPoint2f squareContour = null;
+        for (MatOfPoint contour : contours) {
+            MatOfPoint2f approx = new MatOfPoint2f();
+            MatOfPoint2f contour2f = new MatOfPoint2f(contour.toArray());
+            double peri = Imgproc.arcLength(contour2f, true);
+            Imgproc.approxPolyDP(contour2f, approx, 0.02 * peri, true);
+
+            if (approx.toArray().length == 4) {
+                double area = Imgproc.contourArea(contour);
+                if (area > 1000) {
+                    squareContour = approx;
+                    break;
+                }
+            }
+        }
+
+        if (squareContour == null) {
+            runOnUiThread(() -> Toast.makeText(this, "Square not found", Toast.LENGTH_SHORT).show());
+            return;
+        }
+
+        Point[] points = squareContour.toArray();
+        Point[] sortedPoints = sortPoints(points);
+
+        MatOfPoint2f src = new MatOfPoint2f(
+                sortedPoints[0],
+                sortedPoints[1],
+                sortedPoints[2],
+                sortedPoints[3]
+        );
+        MatOfPoint2f dst = new MatOfPoint2f(
+                new Point(0, 0),
+                new Point(500, 0),
+                new Point(500, 500),
+                new Point(0, 500)
+        );
+
+        Mat warpMat = Imgproc.getPerspectiveTransform(src, dst);
+        Mat correctedMat = new Mat(500, 500, CvType.CV_8UC3);
+        Imgproc.warpPerspective(mat, correctedMat, warpMat, new org.opencv.core.Size(500, 500));
+
+        Bitmap correctedBitmap = Bitmap.createBitmap(500, 500, Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(correctedMat, correctedBitmap);
+
+        runOnUiThread(() -> {
+            if (originalBitmap != null && !originalBitmap.isRecycled()) {
+                originalBitmap.recycle();
+            }
+            originalBitmap = correctedBitmap;
+            resetTransformationsAndFit();
+            updateImageDisplay();
+        });
+
+        mat.release();
+        gray.release();
+        edges.release();
+        hierarchy.release();
+    }
+
+    private Point[] sortPoints(Point[] points) {
+        List<Point> pointList = Arrays.asList(points);
+        Collections.sort(pointList, (p1, p2) -> Double.compare(p1.x + p1.y, p2.x + p2.y));
+        Point topLeft = pointList.get(0);
+        Point bottomRight = pointList.get(3);
+
+        List<Point> remaining = new ArrayList<>(pointList.subList(1, 3));
+        Collections.sort(remaining, (p1, p2) -> Double.compare(p1.x - p1.y, p2.x - p2.y));
+        Point topRight = remaining.get(1);
+        Point bottomLeft = remaining.get(0);
+
+        return new Point[]{topLeft, topRight, bottomRight, bottomLeft};
     }
 
     private void pickImage() {

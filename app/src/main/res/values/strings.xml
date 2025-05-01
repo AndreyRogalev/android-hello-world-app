@@ -1,13 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">HelloWorld</string>
     <string name="pick_image">Pick Image</string>
-    <string name="show_controls">Show Controls</string>
     <string name="pencil_mode">Pencil Mode</string>
     <string name="select_layers">Select Layers</string>
+    <string name="show_controls">Show Controls</string>
     <string name="hide_image">Hide Image</string>
     <string name="save_parameters">Save Parameters</string>
     <string name="load_parameters">Load Parameters</string>
     <string name="switch_camera">Switch Camera</string>
-    <string name="layer_selection_title">Select Pencil Layers</string>
+    <string name="capture_image">Capture Image</string>
+    <string name="layer_selection_title">Select Layers</string>
 </resources>
