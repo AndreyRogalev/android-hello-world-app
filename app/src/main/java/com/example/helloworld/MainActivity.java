@@ -852,7 +852,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         dialog.setTitle(R.string.layer_selection_title);
 
         // Используем ID из вашего файла dialog_layer_selection.xml
-        RecyclerView recyclerView = dialog.findViewById(R.id.layerRecyclerView); // *** ПРОВЕРЬТЕ ЭТОТ ID В ВАШЕМ XML ***
+        RecyclerView recyclerView = dialog.findViewById(R.id.recyclerView); // *** ПРОВЕРЬТЕ ЭТОТ ID В ВАШЕМ XML ***
 
         if (recyclerView == null) { Log.e(TAG, "RecyclerView (R.id.layerRecyclerView) not found!"); Toast.makeText(this, "Error dialog", Toast.LENGTH_SHORT).show(); return; }
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
