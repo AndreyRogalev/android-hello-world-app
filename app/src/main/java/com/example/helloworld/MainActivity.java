@@ -584,7 +584,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private int getLayerIndex(int搞 grayValue) {
+    private int getLayerIndex(int grayValue) {
         return grayValue / (256 / 20);
     }
 
