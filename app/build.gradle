@@ -4,6 +4,7 @@ plugins {
 }
 
 android {
+    namespace 'com.example.helloworld' // Added namespace
     compileSdk 34
 
     defaultConfig {
