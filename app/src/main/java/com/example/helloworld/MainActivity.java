@@ -95,7 +95,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
 
     // --- Image Manipulation ---
     private Bitmap originalBitmap;
-    private Bitmap pencilBitmap;
+    private Bitmap pencilBitmap; // Note: pencilBitmap is created but not directly used for display, layers are used
     private Bitmap[] layerBitmaps;
     private boolean[] layerVisibility;
     private Matrix matrix = new Matrix();
@@ -114,23 +114,37 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     private float initialAngle = 0f;
 
     // --- Pencil Mode Layers ---
-    private static final String[] PENCIL_HARDNESS = { "9H", "8H", "7H", "6H", "5H", "4H", "3H", "2H", "H", "F", "HB", "B", "2B", "3B", "4B", "5B", "6B", "7B", "8B", "9B" };
+    private static final String[] PENCIL_HARDNESS = {
+            "9H", "8H", "7H", "6H", "5H", "4H", "3H", "2H", "H", "F",
+            "HB", "B", "2B", "3B", "4B", "5B", "6B", "7B", "8B", "9B"
+    };
 
     //==========================================================================
-    // SurfaceHolder Callback (Определяем ДО использования в onCreate)
+    // SurfaceHolder Callback (Defined before use in onCreate)
     //==========================================================================
     private final SurfaceHolder.Callback surfaceHolderCallback = new SurfaceHolder.Callback() {
-        @Override public void surfaceCreated(SurfaceHolder holder) {
-            Log.d(TAG, "Surface created"); isSurfaceAvailable = true;
-            if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) openCamera(); else checkPermissionsAndSetupCamera();
+        @Override
+        public void surfaceCreated(SurfaceHolder holder) {
+            Log.d(TAG, "Surface created");
+            isSurfaceAvailable = true;
+            if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                openCamera();
+            } else {
+                checkPermissionsAndSetupCamera();
+            }
         }
-        @Override public void surfaceChanged(SurfaceHolder h, int f, int w, int hgt) {
-            Log.d(TAG, "Surface changed: " + w + "x" + hgt);
-            // Перезапускаем превью только если камера открыта
-            if (isCameraOpen && cameraDevice != null) startCameraPreview();
+        @Override
+        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            Log.d(TAG, "Surface changed: " + width + "x" + height);
+            if (isCameraOpen && cameraDevice != null) {
+                startCameraPreview(); // Restart preview if surface changes
+            }
         }
-        @Override public void surfaceDestroyed(SurfaceHolder holder) {
-            Log.d(TAG, "Surface destroyed"); isSurfaceAvailable = false; closeCamera();
+        @Override
+        public void surfaceDestroyed(SurfaceHolder holder) {
+            Log.d(TAG, "Surface destroyed");
+            isSurfaceAvailable = false;
+            closeCamera();
         }
     };
 
@@ -146,14 +160,14 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleListener());
         imageView.setOnTouchListener(new TouchAndRotateListener());
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
-        cameraSurfaceView.getHolder().addCallback(surfaceHolderCallback); // Теперь callback определен
+        cameraSurfaceView.getHolder().addCallback(surfaceHolderCallback); // Use the defined callback
         setupUIListeners();
         checkPermissionsAndSetupCamera();
         layerVisibility = new boolean[20]; Arrays.fill(layerVisibility, true);
         updateControlsVisibility(controlsVisibilityCheckbox.isChecked());
     }
 
-    private void initializeUI() { /* ... код findViewById ... */
+    private void initializeUI() {
         cameraSurfaceView = findViewById(R.id.cameraSurfaceView); imageView = findViewById(R.id.imageView);
         transparencySeekBar = findViewById(R.id.transparencySeekBar); pickImageButton = findViewById(R.id.pickImageButton);
         pencilModeSwitch = findViewById(R.id.pencilModeSwitch); layerSelectButton = findViewById(R.id.layerSelectButton);
@@ -162,7 +176,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
         switchCameraButton = findViewById(R.id.switchCameraButton);
     }
 
-    private void setupUIListeners() { /* ... код setOnClickListener ... */
+    private void setupUIListeners() {
         transparencySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() { @Override public void onProgressChanged(SeekBar s, int p, boolean u) { setImageAlpha(p); } @Override public void onStartTrackingTouch(SeekBar s) {} @Override public void onStopTrackingTouch(SeekBar s) {} });
         pickImageButton.setOnClickListener(v -> pickImage());
         pencilModeSwitch.setOnCheckedChangeListener((v, isChecked) -> { isPencilMode = isChecked; layerSelectButton.setVisibility(isChecked ? View.VISIBLE : View.GONE); if (isPencilMode) processPencilEffect(); else recyclePencilBitmaps(); updateImageDisplay(); });
@@ -179,25 +193,23 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     //==========================================================================
 
     private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
-        @Override public boolean onScaleBegin(@NonNull ScaleGestureDetector d) { return originalBitmap != null && !originalBitmap.isRecycled(); } // Не меняем touchMode
+        @Override public boolean onScaleBegin(@NonNull ScaleGestureDetector d) { return originalBitmap != null && !originalBitmap.isRecycled(); }
         @Override public boolean onScale(@NonNull ScaleGestureDetector d) { if (originalBitmap == null || !originalBitmap.isRecycled() || touchMode != ZOOM) return false; float scale = d.getScaleFactor(); matrix.postScale(scale, scale, d.getFocusX(), d.getFocusY()); applyTransformations(); return true; }
     }
 
     private class TouchAndRotateListener implements View.OnTouchListener {
         @Override public boolean onTouch(View v, MotionEvent event) {
             if (originalBitmap == null || originalBitmap.isRecycled()) return false;
-            scaleGestureDetector.onTouchEvent(event); // ScaleListener обработает и применит scale
+            scaleGestureDetector.onTouchEvent(event);
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN: savedMatrix.set(matrix); startPoint.set(event.getX(), event.getY()); touchMode = DRAG; break;
                 case MotionEvent.ACTION_POINTER_DOWN: if (event.getPointerCount() >= 2) { savedMatrix.set(matrix); midPoint(midPoint, event); initialAngle = rotation(event); touchMode = ZOOM; } break;
                 case MotionEvent.ACTION_MOVE:
                     if (touchMode == DRAG && event.getPointerCount() == 1) { matrix.set(savedMatrix); matrix.postTranslate(event.getX() - startPoint.x, event.getY() - startPoint.y); applyTransformations(); }
-                    else if (touchMode == ZOOM && event.getPointerCount() >= 2 && !scaleGestureDetector.isInProgress()) { // Вращаем, только если не масштабируем активно
+                    else if (touchMode == ZOOM && event.getPointerCount() >= 2 && !scaleGestureDetector.isInProgress()) { // Rotate only if not scaling
                         float currentAngle = rotation(event); float deltaAngle = currentAngle - initialAngle;
-                        matrix.postRotate(deltaAngle, midPoint.x, midPoint.y); // Применяем вращение к текущей (возможно, уже смасштабированной) матрице
-                        applyTransformations();
-                        // Обновляем savedMatrix и initialAngle для следующего шага, чтобы вращение не "дрейфило"
-                        savedMatrix.set(matrix); initialAngle = currentAngle; midPoint(midPoint, event);
+                        matrix.postRotate(deltaAngle, midPoint.x, midPoint.y); applyTransformations();
+                        savedMatrix.set(matrix); initialAngle = currentAngle; midPoint(midPoint, event); // Update state for next move increment
                     }
                     break;
                 case MotionEvent.ACTION_POINTER_UP: savedMatrix.set(matrix); if (event.getPointerCount() <= 2) { touchMode = NONE; int remIdx = (event.getActionIndex() == 0) ? 1 : 0; if(event.getPointerCount() > remIdx) { startPoint.set(event.getX(remIdx), event.getY(remIdx)); touchMode = DRAG; } } break;
@@ -252,32 +264,44 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
      };
 
     private Size[] getPreviewSizes() { if (cameraId == null) return new Size[]{new Size(1280, 720)}; try { return ((CameraManager) getSystemService(CAMERA_SERVICE)).getCameraCharacteristics(cameraId).get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(SurfaceHolder.class); } catch (Exception e) { return new Size[]{new Size(1280, 720)}; } }
-    private Size chooseOptimalPreviewSize(Size[] choices, int w, int h) { if (choices == null || choices.length == 0) return new Size(1280, 720); double ratio = (w > 0 && h > 0) ? (double) w / h : (16.0 / 9.0); Size opt = null; double diff = Double.MAX_VALUE; final int MAX_A = 1920 * 1080; List<Size> suit = new ArrayList<>(); for (Size s : choices) if ((long)s.getWidth() * s.getHeight() <= MAX_A) suit.add(s); if(suit.isEmpty()) return Collections.min(Arrays.asList(choices), Comparator.comparingLong(s -> (long)s.getWidth() * s.getHeight())); for (Size s : suit) { double r = (double) s.getWidth() / s.getHeight(); double d = Math.abs(r - ratio); if (d < diff) { diff = d; opt = s; } else if (d == diff && opt != null && (long)s.getWidth() * s.getHeight() > (long)opt.getWidth() * opt.getHeight()) opt = s; } if (opt == null) opt = Collections.max(suit, Comparator.comparingLong(s -> (long)s.getWidth() * s.getHeight())); return opt; }
+    private Size chooseOptimalPreviewSize(Size[] choices, int w, int h) { if (choices == null || choices.length == 0) return new Size(1280, 720); double ratio = (w > 0 && h > 0) ? (double) w / h : (16.0 / 9.0); Size opt = null; double diff = Double.MAX_VALUE; final int MAX_A = 1920 * 1080; List<Size> suit = new ArrayList<>(); for (Size s : choices) if ((long)s.getWidth() * s.getHeight() <= MAX_A) suit.add(s); if(suit.isEmpty()) return Collections.min(Arrays.asList(choices), Comparator.comparingLong(s -> (long)s.getWidth() * s.getHeight())); for (Size s : suit) { double r = (double) s.getWidth() / s.getHeight(); double d = Math.abs(r - ratio); if (d < diff) { diff = d; opt = s; } else if (d == diff && opt != null && (long)s.getWidth() * s.getHeight() > (long)opt.getWidth() * opt.getHeight()) opt = s; } if (opt == null) opt = Collections.max(suit, Comparator.comparingLong(s -> (long)s.getWidth() * s.getHeight())); Log.d(TAG, "Chosen preview size: " + opt); return opt; } // Added Log
 
     private void startCameraPreview() {
          synchronized (cameraOpenCloseLock) {
-             if (cameraDevice == null || !isSurfaceAvailable || !isCameraOpen || backgroundHandler == null) return;
+             if (cameraDevice == null || !isSurfaceAvailable || !isCameraOpen || backgroundHandler == null) {
+                 Log.w(TAG, "Cannot start preview - conditions not met.");
+                 return;
+             }
              try {
-                 closeCameraPreviewSession(); if (previewSize == null) previewSize = chooseOptimalPreviewSize(getPreviewSizes(), cameraSurfaceView.getWidth(), cameraSurfaceView.getHeight());
-                 Surface surface = cameraSurfaceView.getHolder().getSurface(); if (!surface.isValid()) return;
+                 closeCameraPreviewSession();
+                 if (previewSize == null) {
+                     previewSize = chooseOptimalPreviewSize(getPreviewSizes(), cameraSurfaceView.getWidth(), cameraSurfaceView.getHeight());
+                     if (previewSize == null) { Log.e(TAG, "Failed to choose preview size!"); return; }
+                 }
 
-                 // --- УДАЛЯЕМ КОРРЕКЦИЮ РАЗМЕРА SURFACE ---
-                 // final Size finalSize = previewSize;
-                 // runOnUiThread(() -> {
-                 //     if(cameraSurfaceView.getHolder().getSurface().isValid()){
-                 //         // НЕ УСТАНАВЛИВАЕМ РАЗМЕР - пусть система сама масштабирует
-                 //         // cameraSurfaceView.getHolder().setFixedSize(finalSize.getWidth(), finalSize.getHeight());
-                 //         Log.d(TAG, "SurfaceHolder size NOT set explicitly.");
-                 //     }
-                 // });
-                 // --- КОНЕЦ УДАЛЕНИЯ ---
+                 Surface surface = cameraSurfaceView.getHolder().getSurface();
+                 if (!surface.isValid()) { Log.e(TAG, "Preview surface is invalid!"); return; }
 
-                 previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW); previewRequestBuilder.addTarget(surface);
+                 // --- ВОЗВРАЩАЕМ УСТАНОВКУ РАЗМЕРА БУФЕРА ---
+                 final Size finalSize = previewSize;
+                 runOnUiThread(() -> {
+                     SurfaceHolder holder = cameraSurfaceView.getHolder();
+                     if (holder != null && holder.getSurface() != null && holder.getSurface().isValid()) {
+                         try {
+                             holder.setFixedSize(finalSize.getWidth(), finalSize.getHeight());
+                             Log.d(TAG, "Set SurfaceHolder fixed size for preview: " + finalSize);
+                         } catch (Exception e) { Log.e(TAG, "Error setting fixed size for SurfaceHolder", e); }
+                     } else { Log.w(TAG, "SurfaceHolder or Surface invalid when setting fixed size."); }
+                 });
+                 // --- КОНЕЦ ВОЗВРАТА ---
+
+                 previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                 previewRequestBuilder.addTarget(surface);
                  cameraDevice.createCaptureSession(Collections.singletonList(surface), new CameraCaptureSession.StateCallback() {
                      @Override public void onConfigured(@NonNull CameraCaptureSession session) { synchronized (cameraOpenCloseLock) { if (cameraDevice == null || !isCameraOpen) { session.close(); return; } cameraCaptureSession = session; try { previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE); cameraCaptureSession.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler); } catch (Exception e) { Log.e(TAG, "Preview repeat err", e); } } }
                      @Override public void onConfigureFailed(@NonNull CameraCaptureSession session) { runOnUiThread(() -> Toast.makeText(MainActivity.this, "Preview cfg fail", Toast.LENGTH_LONG).show()); }
                  }, backgroundHandler);
-             } catch (Exception e) { runOnUiThread(() -> Toast.makeText(MainActivity.this, "Preview start err", Toast.LENGTH_SHORT).show()); }
+             } catch (Exception e) { runOnUiThread(() -> Toast.makeText(MainActivity.this, "Preview start err", Toast.LENGTH_SHORT).show()); Log.e(TAG, "Preview start exception", e); }
          }
      }
 
@@ -288,13 +312,13 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     // --- Image Picking ---
     private void pickImage() { Intent i = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI); checkPermissionsAndSetupCamera(); try { startActivityForResult(i, PICK_IMAGE_REQUEST); } catch (Exception e) { Toast.makeText(this, "No gallery", Toast.LENGTH_SHORT).show(); } }
     @Override protected void onActivityResult(int req, int res, Intent data) { super.onActivityResult(req, res, data); if (req == PICK_IMAGE_REQUEST && res == RESULT_OK && data != null) { Uri uri = data.getData(); if (uri != null) loadImageFromUri(uri); else Toast.makeText(this, "No URI", Toast.LENGTH_SHORT).show(); } }
-     private void loadImageFromUri(Uri uri) { /* ... код без изменений ... */ try { new Thread(() -> { Bitmap bmp = null; try (InputStream is = getContentResolver().openInputStream(uri)) { BitmapFactory.Options opts = new BitmapFactory.Options(); opts.inSampleSize = 2; bmp = BitmapFactory.decodeStream(is, null, opts); } catch (Exception e) { runOnUiThread(()-> Toast.makeText(this, "Load err", Toast.LENGTH_SHORT).show()); } final Bitmap finalBmp = bmp; runOnUiThread(() -> { if (finalBmp != null) { recycleBitmaps(); originalBitmap = finalBmp; if (isPencilMode) { isPencilMode = false; pencilModeSwitch.setChecked(false); layerSelectButton.setVisibility(View.GONE); } layerVisibility = new boolean[20]; Arrays.fill(layerVisibility, true); resetTransformationsAndFit(); updateImageDisplay(); } else Toast.makeText(this, "Load fail", Toast.LENGTH_SHORT).show(); }); }).start(); } catch (Exception e) { Log.e(TAG, "Load thread start err", e); } }
+     private void loadImageFromUri(Uri uri) { try { new Thread(() -> { Bitmap bmp = null; try (InputStream is = getContentResolver().openInputStream(uri)) { BitmapFactory.Options opts = new BitmapFactory.Options(); opts.inSampleSize = 2; bmp = BitmapFactory.decodeStream(is, null, opts); } catch (Exception e) { runOnUiThread(()-> Toast.makeText(this, "Load err", Toast.LENGTH_SHORT).show()); } final Bitmap finalBmp = bmp; runOnUiThread(() -> { if (finalBmp != null) { recycleBitmaps(); originalBitmap = finalBmp; if (isPencilMode) { isPencilMode = false; pencilModeSwitch.setChecked(false); layerSelectButton.setVisibility(View.GONE); } layerVisibility = new boolean[20]; Arrays.fill(layerVisibility, true); resetTransformationsAndFit(); updateImageDisplay(); } else Toast.makeText(this, "Load fail", Toast.LENGTH_SHORT).show(); }); }).start(); } catch (Exception e) { Log.e(TAG, "Load thread start err", e); } }
 
     // --- Image Transformation & Display ---
     private void resetTransformationsAndFit() { matrix.reset(); if (originalBitmap == null || originalBitmap.isRecycled() || imageView.getWidth() == 0 || imageView.getHeight() == 0) { if (imageView != null) runOnUiThread(()-> imageView.setImageMatrix(matrix)); return; } final float vw = imageView.getWidth(), vh = imageView.getHeight(), bw = originalBitmap.getWidth(), bh = originalBitmap.getHeight(); float scale = Math.min(vw / bw, vh / bh); float dx = (vw - bw * scale) / 2f, dy = (vh - bh * scale) / 2f; matrix.setScale(scale, scale); matrix.postTranslate(dx, dy); Log.d(TAG, "Reset & fit. Scale: " + scale); applyTransformations(); }
 
     // --- Pencil Effect Logic ---
-     private void processPencilEffect() { /* ... код без изменений ... */ if (originalBitmap == null || originalBitmap.isRecycled()) { return; } new Thread(() -> { recyclePencilBitmaps(); Bitmap gray = null; Bitmap[] layers = new Bitmap[PENCIL_HARDNESS.length]; boolean ok = false; try { int w = originalBitmap.getWidth(), h = originalBitmap.getHeight(); gray = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); Canvas cg = new Canvas(gray); Paint pg = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG); ColorMatrix cm = new ColorMatrix(); cm.setSaturation(0); pg.setColorFilter(new ColorMatrixColorFilter(cm)); cg.drawBitmap(originalBitmap, 0, 0, pg); int[] pix = new int[w * h]; gray.getPixels(pix, 0, w, 0, 0, w, h); int[][] lpix = new int[layers.length][w * h]; for (int i = 0; i < layers.length; i++) Arrays.fill(lpix[i], Color.TRANSPARENT); for (int i = 0; i < pix.length; i++) { int layerIdx = getLayerIndex(Color.red(pix[i])); if (layerIdx >= 0 && layerIdx < layers.length) lpix[layerIdx][i] = pix[i]; } pix = null; gray.recycle(); gray = null; for (int i = 0; i < layers.length; i++) { layers[i] = Bitmap.createBitmap(lpix[i], w, h, Bitmap.Config.ARGB_8888); lpix[i] = null; } lpix = null; ok = true; } catch (OutOfMemoryError e) { if (gray != null && !gray.isRecycled()) gray.recycle(); for(Bitmap b : layers) if(b!=null && !b.isRecycled()) b.recycle(); runOnUiThread(() -> Toast.makeText(this, "OOM Pencil", Toast.LENGTH_LONG).show()); } catch (Exception e) { runOnUiThread(() -> Toast.makeText(this, "Pencil Err", Toast.LENGTH_SHORT).show()); } final boolean finalOk = ok; final Bitmap[] finalLayers = layers; runOnUiThread(() -> { if (finalOk) { pencilBitmap = null; layerBitmaps = finalLayers; } else { isPencilMode = false; pencilModeSwitch.setChecked(false); layerSelectButton.setVisibility(View.GONE); layerBitmaps = null; } updateImageDisplay(); }); }).start(); }
+     private void processPencilEffect() { if (originalBitmap == null || originalBitmap.isRecycled()) { return; } new Thread(() -> { recyclePencilBitmaps(); Bitmap gray = null; Bitmap[] layers = new Bitmap[PENCIL_HARDNESS.length]; boolean ok = false; try { int w = originalBitmap.getWidth(), h = originalBitmap.getHeight(); gray = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); Canvas cg = new Canvas(gray); Paint pg = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG); ColorMatrix cm = new ColorMatrix(); cm.setSaturation(0); pg.setColorFilter(new ColorMatrixColorFilter(cm)); cg.drawBitmap(originalBitmap, 0, 0, pg); int[] pix = new int[w * h]; gray.getPixels(pix, 0, w, 0, 0, w, h); int[][] lpix = new int[layers.length][w * h]; for (int i = 0; i < layers.length; i++) Arrays.fill(lpix[i], Color.TRANSPARENT); for (int i = 0; i < pix.length; i++) { int layerIdx = getLayerIndex(Color.red(pix[i])); if (layerIdx >= 0 && layerIdx < layers.length) lpix[layerIdx][i] = pix[i]; } pix = null; gray.recycle(); gray = null; for (int i = 0; i < layers.length; i++) { layers[i] = Bitmap.createBitmap(lpix[i], w, h, Bitmap.Config.ARGB_8888); lpix[i] = null; } lpix = null; ok = true; } catch (OutOfMemoryError e) { if (gray != null && !gray.isRecycled()) gray.recycle(); for(Bitmap b : layers) if(b!=null && !b.isRecycled()) b.recycle(); runOnUiThread(() -> Toast.makeText(this, "OOM Pencil", Toast.LENGTH_LONG).show()); } catch (Exception e) { runOnUiThread(() -> Toast.makeText(this, "Pencil Err", Toast.LENGTH_SHORT).show()); } final boolean finalOk = ok; final Bitmap[] finalLayers = layers; runOnUiThread(() -> { if (finalOk) { pencilBitmap = null; layerBitmaps = finalLayers; } else { isPencilMode = false; pencilModeSwitch.setChecked(false); layerSelectButton.setVisibility(View.GONE); layerBitmaps = null; } updateImageDisplay(); }); }).start(); }
      private int getLayerIndex(int grayValue) { int numLayers = PENCIL_HARDNESS.length; if (numLayers <= 0) return -1; int rawIndex = (int) (((float)grayValue / 256.0f) * numLayers); rawIndex = Math.max(0, Math.min(rawIndex, numLayers - 1)); int invertedIndex = (numLayers - 1) - rawIndex; return invertedIndex; }
      private void recyclePencilBitmaps() { if (pencilBitmap != null && !pencilBitmap.isRecycled()) pencilBitmap.recycle(); pencilBitmap = null; if (layerBitmaps != null) { for (Bitmap b : layerBitmaps) if (b != null && !b.isRecycled()) b.recycle(); layerBitmaps = null; } }
 
