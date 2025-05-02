@@ -1,12 +1,19 @@
 // settings.gradle
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
+        // ВОТ ЭТА СТРОКА КРИТИЧНА:
         maven { url 'https://jitpack.io' }
     }
 }
-
-rootProject.name = "HelloWorld"
-include ':app'
+rootProject.name = "android-hello-world-app" // Убедитесь, что остальное тоже на месте
+include ':app' // Убедитесь, что остальное тоже на месте
