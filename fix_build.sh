@@ -31,10 +31,19 @@ cat > app/src/main/res/values/strings.xml << 'EOL'
 <resources>
     <string name="app_name">HelloWorld</string>
     <string name="layer_selection_title">Select Pencil Layers</string>
+    <string name="pick_image">Pick Image</string>
+    <string name="pencil_mode">Pencil Mode</string>
+    <string name="select_layers">Select Layers</string>
+    <string name="show_controls">Show Controls</string>
+    <string name="hide_image">Hide Image</string>
+    <string name="save_parameters">Save Parameters</string>
+    <string name="load_parameters">Load Parameters</string>
+    <string name="switch_camera">Switch Camera</string>
+    <string name="capture_image">Capture Image</string>
 </resources>
 EOL
 
-# Замена MainActivity.java (без OpenCV)
+# Замена MainActivity.java с добавленными импортами
 echo "Замена MainActivity.java..."
 cat > app/src/main/java/com/example/helloworld/MainActivity.java << 'EOL'
 package com.example.helloworld;
@@ -72,6 +81,7 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -95,6 +105,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLayerVisibilityChangedListener {
 

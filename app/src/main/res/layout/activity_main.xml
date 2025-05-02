@@ -81,10 +81,6 @@
             android:text="@string/switch_camera" />
 
         <Button
-            android:id="@+id/captureButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/capture_image" />
     </LinearLayout>
 
 </RelativeLayout>

@@ -10,5 +10,4 @@
     <string name="save_parameters">Save Parameters</string>
     <string name="load_parameters">Load Parameters</string>
     <string name="switch_camera">Switch Camera</string>
-    <string name="capture_image">Capture Image</string>
 </resources>
