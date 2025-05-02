@@ -80,7 +80,8 @@
             android:layout_height="wrap_content"
             android:text="@string/switch_camera" />
 
-        <Button
+        <!-- Блок кнопки captureButton полностью удален -->
+
     </LinearLayout>
 
 </RelativeLayout>
