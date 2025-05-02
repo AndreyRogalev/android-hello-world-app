@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Camera Surface View -->
+    <!-- SurfaceView для отображения камеры -->
     <SurfaceView
         android:id="@+id/cameraSurfaceView"
         android:layout_width="0dp"
@@ -13,9 +13,9 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        app:layout_constraintBottom_toTopOf="@id/buttonPanel" />
 
-    <!-- Image View for Overlay -->
+    <!-- ImageView для наложения изображения -->
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="0dp"
@@ -23,96 +23,110 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        app:layout_constraintBottom_toTopOf="@id/buttonPanel" />
 
-    <!-- Transparency SeekBar -->
+    <!-- Панель кнопок (ConstraintLayout для кнопок и других элементов) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/buttonPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:padding="8dp">
+
+        <!-- Первая строка: Pick Image, Pencil Mode, Layer Select -->
+        <Button
+            android:id="@+id/pickImageButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/pick_image"
+            android:layout_marginEnd="8dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <Switch
+            android:id="@+id/pencilModeSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/pencil_mode"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toEndOf="@id/pickImageButton" />
+
+        <Button
+            android:id="@+id/layerSelectButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/select_layers"
+            android:layout_marginStart="8dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toEndOf="@id/pencilModeSwitch" />
+
+        <!-- Вторая строка: Checkboxes -->
+        <CheckBox
+            android:id="@+id/controlsVisibilityCheckbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/show_controls"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="8dp"
+            app:layout_constraintTop_toBottomOf="@id/pickImageButton"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <CheckBox
+            android:id="@+id/hideImageCheckbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/hide_image"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="8dp"
+            app:layout_constraintTop_toBottomOf="@id/pencilModeSwitch"
+            app:layout_constraintStart_toEndOf="@id/controlsVisibilityCheckbox" />
+
+        <!-- Третья строка: Save Parameters, Load Parameters, Switch Camera -->
+        <Button
+            android:id="@+id/saveParametersButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/save_parameters"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="8dp"
+            app:layout_constraintTop_toBottomOf="@id/controlsVisibilityCheckbox"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <Button
+            android:id="@+id/loadParametersButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/load_parameters"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            app:layout_constraintTop_toBottomOf="@id/hideImageCheckbox"
+            app:layout_constraintStart_toEndOf="@id/saveParametersButton" />
+
+        <Button
+            android:id="@+id/switchCameraButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/switch_camera"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="8dp"
+            app:layout_constraintTop_toBottomOf="@id/hideImageCheckbox"
+            app:layout_constraintStart_toEndOf="@id/loadParametersButton" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- SeekBar для прозрачности -->
     <SeekBar
         android:id="@+id/transparencySeekBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/buttonPanel"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- Pick Image Button -->
-    <Button
-        android:id="@+id/pickImageButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/pick_image"
-        android:layout_margin="16dp"
-        app:layout_constraintBottom_toTopOf="@id/transparencySeekBar"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <!-- Pencil Mode Switch -->
-    <Switch
-        android:id="@+id/pencilModeSwitch"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/pencil_mode"
-        android:layout_margin="16dp"
-        app:layout_constraintBottom_toTopOf="@id/transparencySeekBar"
-        app:layout_constraintStart_toEndOf="@id/pickImageButton" />
-
-    <!-- Layer Selection Button -->
-    <Button
-        android:id="@+id/layerSelectButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/select_layers"
-        android:layout_margin="16dp"
-        app:layout_constraintBottom_toTopOf="@id/transparencySeekBar"
-        app:layout_constraintStart_toEndOf="@id/pencilModeSwitch" />
-
-    <!-- Controls Visibility Checkbox -->
-    <CheckBox
-        android:id="@+id/controlsVisibilityCheckbox"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/show_controls"
-        android:layout_margin="16dp"
-        app:layout_constraintBottom_toTopOf="@id/transparencySeekBar"
-        app:layout_constraintEnd_toStartOf="@id/hideImageCheckbox" />
-
-    <!-- Hide Image Checkbox -->
-    <CheckBox
-        android:id="@+id/hideImageCheckbox"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/hide_image"
-        android:layout_margin="16dp"
-        app:layout_constraintBottom_toTopOf="@id/transparencySeekBar"
-        app:layout_constraintEnd_toStartOf="@id/saveParametersButton" />
-
-    <!-- Save Parameters Button -->
-    <Button
-        android:id="@+id/saveParametersButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/save_parameters"
-        android:layout_margin="16dp"
-        app:layout_constraintBottom_toTopOf="@id/transparencySeekBar"
-        app:layout_constraintEnd_toStartOf="@id/loadParametersButton" />
-
-    <!-- Load Parameters Button -->
-    <Button
-        android:id="@+id/loadParametersButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/load_parameters"
-        android:layout_margin="16dp"
-        app:layout_constraintBottom_toTopOf="@id/transparencySeekBar"
-        app:layout_constraintEnd_toStartOf="@id/switchCameraButton" />
-
-    <!-- Switch Camera Button -->
-    <Button
-        android:id="@+id/switchCameraButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/switch_camera"
-        android:layout_margin="16dp"
-        app:layout_constraintBottom_toTopOf="@id/transparencySeekBar"
         app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
