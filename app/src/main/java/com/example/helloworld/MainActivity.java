@@ -32,6 +32,7 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+import android.view.SurfaceView; // Added import
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -49,6 +50,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException; // Added import
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -822,7 +824,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
         Dialog d = new Dialog(this);
         d.setContentView(R.layout.dialog_layer_selection);
         d.setTitle(R.string.layer_selection_title);
-        RecyclerView rv = d.findViewById(R.id.recyclerView); // Updated ID
+        RecyclerView rv = d.findViewById(R.id.recyclerView);
         if (rv == null) return;
         rv.setLayoutManager(new LinearLayoutManager(this));
         LayerAdapter a = new LayerAdapter(PENCIL_HARDNESS, layerVisibility, this);
@@ -926,7 +928,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
                 } else updateImageDisplay();
                 Toast.makeText(this, "Loaded", Toast.LENGTH_SHORT).show();
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             Toast.makeText(this, "Load Err", Toast.LENGTH_LONG).show();
         }
     }
@@ -974,4 +976,4 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
         super.onConfigurationChanged(newConfig);
         imageView.postDelayed(this::resetTransformationsAndFit, 100);
     }
-} // End MainActivity
+}
