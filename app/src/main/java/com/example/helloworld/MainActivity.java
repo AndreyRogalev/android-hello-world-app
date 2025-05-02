@@ -20,6 +20,7 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.params.StreamConfigurationMap; // Добавлен импорт
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -57,7 +58,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeUnit; // Используется для tryAcquire, хотя сейчас закомментировано
 
 public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLayerVisibilityChangedListener {
 
@@ -95,7 +96,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
 
     // --- Image Manipulation ---
     private Bitmap originalBitmap;
-    private Bitmap pencilBitmap; // Note: pencilBitmap is created but not directly used for display, layers are used
+    private Bitmap pencilBitmap;
     private Bitmap[] layerBitmaps;
     private boolean[] layerVisibility;
     private Matrix matrix = new Matrix();
@@ -137,7 +138,10 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
         public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             Log.d(TAG, "Surface changed: " + width + "x" + height);
             if (isCameraOpen && cameraDevice != null) {
-                startCameraPreview(); // Restart preview if surface changes
+                // Пересчитываем оптимальный размер превью для нового размера SurfaceView
+                previewSize = chooseOptimalPreviewSize(getPreviewSizes(), width, height);
+                // Перезапускаем превью с новым размером
+                startCameraPreview();
             }
         }
         @Override
@@ -160,7 +164,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleListener());
         imageView.setOnTouchListener(new TouchAndRotateListener());
         imageView.setScaleType(ImageView.ScaleType.MATRIX);
-        cameraSurfaceView.getHolder().addCallback(surfaceHolderCallback); // Use the defined callback
+        cameraSurfaceView.getHolder().addCallback(surfaceHolderCallback);
         setupUIListeners();
         checkPermissionsAndSetupCamera();
         layerVisibility = new boolean[20]; Arrays.fill(layerVisibility, true);
@@ -263,8 +267,8 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
          @Override public void onError(@NonNull CameraDevice camera, int error) { runOnUiThread(() -> Toast.makeText(MainActivity.this, "Cam Err: "+error, Toast.LENGTH_LONG).show()); closeCamera(); }
      };
 
-    private Size[] getPreviewSizes() { if (cameraId == null) return new Size[]{new Size(1280, 720)}; try { return ((CameraManager) getSystemService(CAMERA_SERVICE)).getCameraCharacteristics(cameraId).get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(SurfaceHolder.class); } catch (Exception e) { return new Size[]{new Size(1280, 720)}; } }
-    private Size chooseOptimalPreviewSize(Size[] choices, int w, int h) { if (choices == null || choices.length == 0) return new Size(1280, 720); double ratio = (w > 0 && h > 0) ? (double) w / h : (16.0 / 9.0); Size opt = null; double diff = Double.MAX_VALUE; final int MAX_A = 1920 * 1080; List<Size> suit = new ArrayList<>(); for (Size s : choices) if ((long)s.getWidth() * s.getHeight() <= MAX_A) suit.add(s); if(suit.isEmpty()) return Collections.min(Arrays.asList(choices), Comparator.comparingLong(s -> (long)s.getWidth() * s.getHeight())); for (Size s : suit) { double r = (double) s.getWidth() / s.getHeight(); double d = Math.abs(r - ratio); if (d < diff) { diff = d; opt = s; } else if (d == diff && opt != null && (long)s.getWidth() * s.getHeight() > (long)opt.getWidth() * opt.getHeight()) opt = s; } if (opt == null) opt = Collections.max(suit, Comparator.comparingLong(s -> (long)s.getWidth() * s.getHeight())); Log.d(TAG, "Chosen preview size: " + opt); return opt; } // Added Log
+    private Size[] getPreviewSizes() { if (cameraId == null) return new Size[]{new Size(1280, 720)}; try { CameraManager manager = (CameraManager) getSystemService(CAMERA_SERVICE); CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId); StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP); return map != null ? map.getOutputSizes(SurfaceHolder.class) : new Size[]{new Size(1280, 720)}; } catch (Exception e) { Log.e(TAG, "Error getting preview sizes", e); return new Size[]{new Size(1280, 720)}; } }
+    private Size chooseOptimalPreviewSize(Size[] choices, int w, int h) { if (choices == null || choices.length == 0) return new Size(1280, 720); double ratio = (w > 0 && h > 0) ? (double) w / h : (16.0 / 9.0); Size opt = null; double diff = Double.MAX_VALUE; final int MAX_A = 1920 * 1080; List<Size> suit = new ArrayList<>(); for (Size s : choices) if ((long)s.getWidth() * s.getHeight() <= MAX_A) suit.add(s); if(suit.isEmpty()) return Collections.min(Arrays.asList(choices), Comparator.comparingLong(s -> (long)s.getWidth() * s.getHeight())); for (Size s : suit) { double r = (double) s.getWidth() / s.getHeight(); double d = Math.abs(r - ratio); if (d < diff) { diff = d; opt = s; } else if (d == diff && opt != null && (long)s.getWidth() * s.getHeight() > (long)opt.getWidth() * opt.getHeight()) opt = s; } if (opt == null) opt = Collections.max(suit, Comparator.comparingLong(s -> (long)s.getWidth() * s.getHeight())); Log.d(TAG, "Chosen preview size: " + opt); return opt; }
 
     private void startCameraPreview() {
          synchronized (cameraOpenCloseLock) {
@@ -282,7 +286,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
                  Surface surface = cameraSurfaceView.getHolder().getSurface();
                  if (!surface.isValid()) { Log.e(TAG, "Preview surface is invalid!"); return; }
 
-                 // --- ВОЗВРАЩАЕМ УСТАНОВКУ РАЗМЕРА БУФЕРА ---
+                 // --- УСТАНАВЛИВАЕМ РАЗМЕР БУФЕРА SURFACEHOLDER ---
                  final Size finalSize = previewSize;
                  runOnUiThread(() -> {
                      SurfaceHolder holder = cameraSurfaceView.getHolder();
@@ -293,7 +297,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
                          } catch (Exception e) { Log.e(TAG, "Error setting fixed size for SurfaceHolder", e); }
                      } else { Log.w(TAG, "SurfaceHolder or Surface invalid when setting fixed size."); }
                  });
-                 // --- КОНЕЦ ВОЗВРАТА ---
+                 // --- КОНЕЦ УСТАНОВКИ РАЗМЕРА ---
 
                  previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
                  previewRequestBuilder.addTarget(surface);
@@ -318,7 +322,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     private void resetTransformationsAndFit() { matrix.reset(); if (originalBitmap == null || originalBitmap.isRecycled() || imageView.getWidth() == 0 || imageView.getHeight() == 0) { if (imageView != null) runOnUiThread(()-> imageView.setImageMatrix(matrix)); return; } final float vw = imageView.getWidth(), vh = imageView.getHeight(), bw = originalBitmap.getWidth(), bh = originalBitmap.getHeight(); float scale = Math.min(vw / bw, vh / bh); float dx = (vw - bw * scale) / 2f, dy = (vh - bh * scale) / 2f; matrix.setScale(scale, scale); matrix.postTranslate(dx, dy); Log.d(TAG, "Reset & fit. Scale: " + scale); applyTransformations(); }
 
     // --- Pencil Effect Logic ---
-     private void processPencilEffect() { if (originalBitmap == null || originalBitmap.isRecycled()) { return; } new Thread(() -> { recyclePencilBitmaps(); Bitmap gray = null; Bitmap[] layers = new Bitmap[PENCIL_HARDNESS.length]; boolean ok = false; try { int w = originalBitmap.getWidth(), h = originalBitmap.getHeight(); gray = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); Canvas cg = new Canvas(gray); Paint pg = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG); ColorMatrix cm = new ColorMatrix(); cm.setSaturation(0); pg.setColorFilter(new ColorMatrixColorFilter(cm)); cg.drawBitmap(originalBitmap, 0, 0, pg); int[] pix = new int[w * h]; gray.getPixels(pix, 0, w, 0, 0, w, h); int[][] lpix = new int[layers.length][w * h]; for (int i = 0; i < layers.length; i++) Arrays.fill(lpix[i], Color.TRANSPARENT); for (int i = 0; i < pix.length; i++) { int layerIdx = getLayerIndex(Color.red(pix[i])); if (layerIdx >= 0 && layerIdx < layers.length) lpix[layerIdx][i] = pix[i]; } pix = null; gray.recycle(); gray = null; for (int i = 0; i < layers.length; i++) { layers[i] = Bitmap.createBitmap(lpix[i], w, h, Bitmap.Config.ARGB_8888); lpix[i] = null; } lpix = null; ok = true; } catch (OutOfMemoryError e) { if (gray != null && !gray.isRecycled()) gray.recycle(); for(Bitmap b : layers) if(b!=null && !b.isRecycled()) b.recycle(); runOnUiThread(() -> Toast.makeText(this, "OOM Pencil", Toast.LENGTH_LONG).show()); } catch (Exception e) { runOnUiThread(() -> Toast.makeText(this, "Pencil Err", Toast.LENGTH_SHORT).show()); } final boolean finalOk = ok; final Bitmap[] finalLayers = layers; runOnUiThread(() -> { if (finalOk) { pencilBitmap = null; layerBitmaps = finalLayers; } else { isPencilMode = false; pencilModeSwitch.setChecked(false); layerSelectButton.setVisibility(View.GONE); layerBitmaps = null; } updateImageDisplay(); }); }).start(); }
+     private void processPencilEffect() { /* ... код без изменений ... */ if (originalBitmap == null || originalBitmap.isRecycled()) { return; } new Thread(() -> { recyclePencilBitmaps(); Bitmap gray = null; Bitmap[] layers = new Bitmap[PENCIL_HARDNESS.length]; boolean ok = false; try { int w = originalBitmap.getWidth(), h = originalBitmap.getHeight(); gray = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); Canvas cg = new Canvas(gray); Paint pg = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG); ColorMatrix cm = new ColorMatrix(); cm.setSaturation(0); pg.setColorFilter(new ColorMatrixColorFilter(cm)); cg.drawBitmap(originalBitmap, 0, 0, pg); int[] pix = new int[w * h]; gray.getPixels(pix, 0, w, 0, 0, w, h); int[][] lpix = new int[layers.length][w * h]; for (int i = 0; i < layers.length; i++) Arrays.fill(lpix[i], Color.TRANSPARENT); for (int i = 0; i < pix.length; i++) { int layerIdx = getLayerIndex(Color.red(pix[i])); if (layerIdx >= 0 && layerIdx < layers.length) lpix[layerIdx][i] = pix[i]; } pix = null; gray.recycle(); gray = null; for (int i = 0; i < layers.length; i++) { layers[i] = Bitmap.createBitmap(lpix[i], w, h, Bitmap.Config.ARGB_8888); lpix[i] = null; } lpix = null; ok = true; } catch (OutOfMemoryError e) { if (gray != null && !gray.isRecycled()) gray.recycle(); for(Bitmap b : layers) if(b!=null && !b.isRecycled()) b.recycle(); runOnUiThread(() -> Toast.makeText(this, "OOM Pencil", Toast.LENGTH_LONG).show()); } catch (Exception e) { runOnUiThread(() -> Toast.makeText(this, "Pencil Err", Toast.LENGTH_SHORT).show()); } final boolean finalOk = ok; final Bitmap[] finalLayers = layers; runOnUiThread(() -> { if (finalOk) { pencilBitmap = null; layerBitmaps = finalLayers; } else { isPencilMode = false; pencilModeSwitch.setChecked(false); layerSelectButton.setVisibility(View.GONE); layerBitmaps = null; } updateImageDisplay(); }); }).start(); }
      private int getLayerIndex(int grayValue) { int numLayers = PENCIL_HARDNESS.length; if (numLayers <= 0) return -1; int rawIndex = (int) (((float)grayValue / 256.0f) * numLayers); rawIndex = Math.max(0, Math.min(rawIndex, numLayers - 1)); int invertedIndex = (numLayers - 1) - rawIndex; return invertedIndex; }
      private void recyclePencilBitmaps() { if (pencilBitmap != null && !pencilBitmap.isRecycled()) pencilBitmap.recycle(); pencilBitmap = null; if (layerBitmaps != null) { for (Bitmap b : layerBitmaps) if (b != null && !b.isRecycled()) b.recycle(); layerBitmaps = null; } }
 
@@ -329,7 +333,16 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     // --- Save/Load Parameters ---
     private float getMatrixScale(Matrix mat) { float[] v = new float[9]; mat.getValues(v); float sx = v[Matrix.MSCALE_X], sy = v[Matrix.MSKEW_Y]; return (float) Math.sqrt(sx * sx + sy * sy); }
     private void saveParameters() { /* ... код без изменений ... */ try { File f = new File(getFilesDir(), "parameters.dat"); try (FileOutputStream fos = new FileOutputStream(f)) { float[] mv = new float[9]; matrix.getValues(mv); fos.write(("matrix=" + mv[0]+","+mv[1]+","+mv[2]+","+mv[3]+","+mv[4]+","+mv[5]+","+mv[6]+","+mv[7]+","+mv[8] + "\n").getBytes()); fos.write(("isPencilMode=" + isPencilMode + "\n").getBytes()); fos.write(("isImageVisible=" + isImageVisible + "\n").getBytes()); fos.write(("controlsVisible=" + controlsVisibilityCheckbox.isChecked() + "\n").getBytes()); fos.write(("transparency=" + transparencySeekBar.getProgress() + "\n").getBytes()); StringBuilder ls = new StringBuilder("layerVisibility="); for (int i = 0; i < layerVisibility.length; i++) { ls.append(layerVisibility[i]); if (i < layerVisibility.length - 1) ls.append(","); } fos.write((ls.toString() + "\n").getBytes()); Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show(); } } catch (IOException e) { Toast.makeText(this, "Save Err", Toast.LENGTH_LONG).show(); } }
-    private void loadParameters() { /* ... код без изменений ... */ try { File f = new File(getFilesDir(), "parameters.dat"); if (!f.exists()) { Toast.makeText(this, "No params", Toast.LENGTH_SHORT).show(); return; } try (FileInputStream fis = new FileInputStream(f); java.util.Scanner sc = new java.util.Scanner(fis)) { boolean loadedPencil = isPencilMode; while (sc.hasNextLine()) { String l = sc.nextLine(); String[] p = l.split("=", 2); if (p.length != 2) continue; String k = p[0], v = p[1]; try { switch (k) { case "matrix": String[] mvs = v.split(","); if (mvs.length == 9) { float[] vals = new float[9]; for (int i = 0; i < 9; i++) vals[i] = Float.parseFloat(mvs[i]); matrix.setValues(vals); } break; case "isPencilMode": isPencilMode = Boolean.parseBoolean(v); break; case "isImageVisible": isImageVisible = Boolean.parseBoolean(v); break; case "controlsVisible": controlsVisibilityCheckbox.setChecked(Boolean.parseBoolean(v)); break; case "transparency": transparencySeekBar.setProgress(Integer.parseInt(v)); break; case "layerVisibility": String[] visVals = v.split(","); for (int i = 0; i < layerVisibility.length && i < visVals.length; i++) layerVisibility[i] = Boolean.parseBoolean(visVals[i]); break; } } catch (Exception e) { Log.w(TAG, "Parse err", e); } } pencilModeSwitch.setChecked(isPencilMode); hideImageCheckbox.setChecked(!isImageVisible); updateControlsVisibility(controlsVisibilityCheckbox.isChecked()); applyTransformations(); if (isPencilMode && originalBitmap != null) { if (!loadedPencil) processPencilEffect(); else updateImageDisplay(); } else updateImageDisplay(); Toast.makeText(this, "Loaded", Toast.LENGTH_SHORT).show(); } } catch (Exception e) { Toast.makeText(this, "Load Err", Toast.LENGTH_LONG).show(); } }
+    private void loadParameters() { /* ... код без изменений ... */ try { File f = new File(getFilesDir(), "parameters.dat"); if (!f.exists()) { Toast.makeText(this, "No params", Toast.LENGTH_SHORT).show(); return; } try (FileInputStream fis = new FileInputStream(f); java.util.Scanner sc = new java.util.Scanner(fis)) { boolean loadedPencil = isPencilMode; float loadedScaleFactor = 1.0f; // Добавим переменную для scaleFactor из файла
+    while (sc.hasNextLine()) { String l = sc.nextLine(); String[] p = l.split("=", 2); if (p.length != 2) continue; String k = p[0], v = p[1]; try { switch (k) {
+    case "scaleFactor": loadedScaleFactor = Float.parseFloat(v); break; // Сохраняем scaleFactor из файла
+    case "matrix": String[] mvs = v.split(","); if (mvs.length == 9) { float[] vals = new float[9]; for (int i = 0; i < 9; i++) vals[i] = Float.parseFloat(mvs[i]); matrix.setValues(vals);
+        // Пересчитываем scaleFactor из загруженной матрицы, чтобы он был актуальным
+         // float scaleX = vals[Matrix.MSCALE_X], skewY = vals[Matrix.MSKEW_Y];
+         // scaleFactor = (float)Math.sqrt(scaleX * scaleX + skewY * skewY); // Убрали пересчет, используем сохраненный
+     } break; case "isPencilMode": isPencilMode = Boolean.parseBoolean(v); break; case "isImageVisible": isImageVisible = Boolean.parseBoolean(v); break; case "controlsVisible": controlsVisibilityCheckbox.setChecked(Boolean.parseBoolean(v)); break; case "transparency": transparencySeekBar.setProgress(Integer.parseInt(v)); break; case "layerVisibility": String[] visVals = v.split(","); for (int i = 0; i < layerVisibility.length && i < visVals.length; i++) layerVisibility[i] = Boolean.parseBoolean(visVals[i]); break; } } catch (Exception e) { Log.w(TAG, "Parse err", e); } }
+    // scaleFactor = loadedScaleFactor; // Применяем сохраненный scaleFactor (если нужно для старых файлов)
+    pencilModeSwitch.setChecked(isPencilMode); hideImageCheckbox.setChecked(!isImageVisible); updateControlsVisibility(controlsVisibilityCheckbox.isChecked()); applyTransformations(); if (isPencilMode && originalBitmap != null) { if (!loadedPencil) processPencilEffect(); else updateImageDisplay(); } else updateImageDisplay(); Toast.makeText(this, "Loaded", Toast.LENGTH_SHORT).show(); } } catch (Exception e) { Toast.makeText(this, "Load Err", Toast.LENGTH_LONG).show(); } }
 
     // --- Activity Lifecycle ---
     @Override protected void onResume() { super.onResume(); startBackgroundThread(); if (isSurfaceAvailable && ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) { if (!isCameraOpen) openCamera(); else startCameraPreview(); } }
