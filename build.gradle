@@ -1,18 +1,22 @@
-// Top-level build.gradle (project-level)
+// Top-level build.gradle
 buildscript {
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath 'com.android.tools.build:gradle:8.2.0' // Update to 8.2.0 or later
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0' // Ensure compatible Kotlin version
     }
 }
 
-plugins {
-    id 'org.jetbrains.kotlin.android' version '1.9.0' apply false
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
 }
 
-allprojects {
-    // Repositories are managed in settings.gradle
+task clean(type: Delete) {
+    delete rootProject.buildDir
 }
