@@ -5,7 +5,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- SurfaceView для отображения камеры -->
     <SurfaceView
         android:id="@+id/cameraSurfaceView"
         android:layout_width="0dp"
@@ -13,9 +12,8 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/buttonPanel" />
+        app:layout_constraintBottom_toTopOf="@id/controlPanel" />
 
-    <!-- ImageView для наложения изображения -->
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="0dp"
@@ -23,11 +21,10 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/buttonPanel" />
+        app:layout_constraintBottom_toTopOf="@id/controlPanel" />
 
-    <!-- Панель кнопок (ConstraintLayout для кнопок и других элементов) -->
     <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/buttonPanel"
+        android:id="@+id/controlPanel"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -35,7 +32,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:padding="8dp">
 
-        <!-- Первая строка: Pick Image, Pencil Mode, Layer Select -->
         <Button
             android:id="@+id/pickImageButton"
             android:layout_width="wrap_content"
@@ -64,7 +60,6 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toEndOf="@id/pencilModeSwitch" />
 
-        <!-- Вторая строка: Checkboxes -->
         <CheckBox
             android:id="@+id/controlsVisibilityCheckbox"
             android:layout_width="wrap_content"
@@ -85,7 +80,6 @@
             app:layout_constraintTop_toBottomOf="@id/pencilModeSwitch"
             app:layout_constraintStart_toEndOf="@id/controlsVisibilityCheckbox" />
 
-        <!-- Третья строка: Save Parameters, Load Parameters, Switch Camera -->
         <Button
             android:id="@+id/saveParametersButton"
             android:layout_width="wrap_content"
@@ -119,13 +113,12 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- SeekBar для прозрачности -->
     <SeekBar
         android:id="@+id/transparencySeekBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
-        app:layout_constraintBottom_toTopOf="@id/buttonPanel"
+        app:layout_constraintBottom_toTopOf="@id/controlPanel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
