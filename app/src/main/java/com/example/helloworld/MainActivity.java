@@ -33,7 +33,6 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.Surface;
 import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -49,15 +48,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import org.opencv.android.OpenCVLoader;
-import org.opencv.android.Utils;
-import org.opencv.core.CvType;
-import org.opencv.core.Mat;
-import org.opencv.core.MatOfPoint;
-import org.opencv.core.MatOfPoint2f;
-import org.opencv.core.Point;
-import org.opencv.imgproc.Imgproc;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -66,8 +56,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.Semaphore;
 
 public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLayerVisibilityChangedListener {
 
@@ -96,7 +84,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     private Size previewSize;
     private HandlerThread backgroundThread;
     private Handler backgroundHandler;
-    private final Semaphore cameraOpenCloseLock = new Semaphore(1);
+    private final Object cameraOpenCloseLock = new Object();
     private volatile boolean isSurfaceAvailable = false;
     private volatile boolean isCameraPendingOpen = false;
     private volatile boolean isCameraOpen = false;
@@ -130,14 +118,6 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        // Initialize OpenCV
-        if (!OpenCVLoader.initDebug()) {
-            Log.e(TAG, "OpenCV initialization failed!");
-            Toast.makeText(this, "OpenCV initialization failed!", Toast.LENGTH_LONG).show();
-        } else {
-            Log.d(TAG, "OpenCV initialized successfully");
-        }
 
         cameraSurfaceView = findViewById(R.id.cameraSurfaceView);
         imageView = findViewById(R.id.imageView);
@@ -411,45 +391,48 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 return;
             }
-            cameraOpenCloseLock.acquire();
-            isCameraOpen = true;
-            manager.openCamera(cameraId, new CameraDevice.StateCallback() {
-                @Override
-                public void onOpened(@NonNull CameraDevice camera) {
-                    cameraDevice = camera;
-                    if (isSurfaceAvailable) {
-                        createCameraPreviewSession();
-                    } else {
-                        Log.d(TAG, "Surface not available after camera opened, closing camera");
-                        closeCamera();
+            synchronized (cameraOpenCloseLock) {
+                isCameraOpen = true;
+                manager.openCamera(cameraId, new CameraDevice.StateCallback() {
+                    @Override
+                    public void onOpened(@NonNull CameraDevice camera) {
+                        cameraDevice = camera;
+                        if (isSurfaceAvailable) {
+                            createCameraPreviewSession();
+                        } else {
+                            Log.d(TAG, "Surface not available after camera opened, closing camera");
+                            closeCamera();
+                        }
+                        synchronized (cameraOpenCloseLock) {
+                            cameraOpenCloseLock.notify();
+                        }
                     }
-                    cameraOpenCloseLock.release();
-                }
 
-                @Override
-                public void onDisconnected(@NonNull CameraDevice camera) {
-                    cameraOpenCloseLock.release();
-                    camera.close();
-                    cameraDevice = null;
-                    isCameraOpen = false;
-                }
+                    @Override
+                    public void onDisconnected(@NonNull CameraDevice camera) {
+                        synchronized (cameraOpenCloseLock) {
+                            cameraOpenCloseLock.notify();
+                        }
+                        camera.close();
+                        cameraDevice = null;
+                        isCameraOpen = false;
+                    }
 
-                @Override
-                public void onError(@NonNull CameraDevice camera, int error) {
-                    cameraOpenCloseLock.release();
-                    camera.close();
-                    cameraDevice = null;
-                    isCameraOpen = false;
-                    Toast.makeText(MainActivity.this, "Camera error: " + error, Toast.LENGTH_LONG).show();
-                }
-            }, backgroundHandler);
+                    @Override
+                    public void onError(@NonNull CameraDevice camera, int error) {
+                        synchronized (cameraOpenCloseLock) {
+                            cameraOpenCloseLock.notify();
+                        }
+                        camera.close();
+                        cameraDevice = null;
+                        isCameraOpen = false;
+                        Toast.makeText(MainActivity.this, "Camera error: " + error, Toast.LENGTH_LONG).show();
+                    }
+                }, backgroundHandler);
+            }
         } catch (CameraAccessException e) {
             Log.e(TAG, "Cannot access camera", e);
             Toast.makeText(this, "Cannot access camera", Toast.LENGTH_LONG).show();
-            isCameraOpen = false;
-        } catch (InterruptedException e) {
-            Log.e(TAG, "Interrupted while opening camera", e);
-            cameraOpenCloseLock.release();
             isCameraOpen = false;
         }
     }
@@ -557,8 +540,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     }
 
     private void closeCamera() {
-        try {
-            cameraOpenCloseLock.acquire();
+        synchronized (cameraOpenCloseLock) {
             closeCameraPreviewSession();
             if (cameraDevice != null) {
                 cameraDevice.close();
@@ -569,10 +551,6 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
                 imageReader = null;
             }
             isCameraOpen = false;
-        } catch (InterruptedException e) {
-            Log.e(TAG, "Error closing camera", e);
-        } finally {
-            cameraOpenCloseLock.release();
         }
         stopBackgroundThread();
     }
@@ -625,92 +603,15 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
     }
 
     private void processCapturedImage(Bitmap bitmap) {
-        Mat mat = new Mat();
-        Utils.bitmapToMat(bitmap, mat);
-
-        Mat gray = new Mat();
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY);
-
-        Imgproc.GaussianBlur(gray, gray, new org.opencv.core.Size(5, 5), 0);
-
-        Mat edges = new Mat();
-        Imgproc.Canny(gray, edges, 50, 150);
-
-        List<MatOfPoint> contours = new ArrayList<>();
-        Mat hierarchy = new Mat();
-        Imgproc.findContours(edges, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
-
-        MatOfPoint2f squareContour = null;
-        for (MatOfPoint contour : contours) {
-            MatOfPoint2f approx = new MatOfPoint2f();
-            MatOfPoint2f contour2f = new MatOfPoint2f(contour.toArray());
-            double peri = Imgproc.arcLength(contour2f, true);
-            Imgproc.approxPolyDP(contour2f, approx, 0.02 * peri, true);
-
-            if (approx.toArray().length == 4) {
-                double area = Imgproc.contourArea(contour);
-                if (area > 1000) {
-                    squareContour = approx;
-                    break;
-                }
-            }
-        }
-
-        if (squareContour == null) {
-            runOnUiThread(() -> Toast.makeText(this, "Square not found", Toast.LENGTH_SHORT).show());
-            return;
-        }
-
-        Point[] points = squareContour.toArray();
-        Point[] sortedPoints = sortPoints(points);
-
-        MatOfPoint2f src = new MatOfPoint2f(
-                sortedPoints[0],
-                sortedPoints[1],
-                sortedPoints[2],
-                sortedPoints[3]
-        );
-        MatOfPoint2f dst = new MatOfPoint2f(
-                new Point(0, 0),
-                new Point(500, 0),
-                new Point(500, 500),
-                new Point(0, 500)
-        );
-
-        Mat warpMat = Imgproc.getPerspectiveTransform(src, dst);
-        Mat correctedMat = new Mat(500, 500, CvType.CV_8UC3);
-        Imgproc.warpPerspective(mat, correctedMat, warpMat, new org.opencv.core.Size(500, 500));
-
-        Bitmap correctedBitmap = Bitmap.createBitmap(500, 500, Bitmap.Config.ARGB_8888);
-        Utils.matToBitmap(correctedMat, correctedBitmap);
-
+        // Упрощённая обработка без OpenCV: просто сохраняем изображение
         runOnUiThread(() -> {
             if (originalBitmap != null && !originalBitmap.isRecycled()) {
                 originalBitmap.recycle();
             }
-            originalBitmap = correctedBitmap;
+            originalBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
             resetTransformationsAndFit();
             updateImageDisplay();
         });
-
-        mat.release();
-        gray.release();
-        edges.release();
-        hierarchy.release();
-    }
-
-    private Point[] sortPoints(Point[] points) {
-        List<Point> pointList = Arrays.asList(points);
-        Collections.sort(pointList, (p1, p2) -> Double.compare(p1.x + p1.y, p2.x + p2.y));
-        Point topLeft = pointList.get(0);
-        Point bottomRight = pointList.get(3);
-
-        List<Point> remaining = new ArrayList<>(pointList.subList(1, 3));
-        Collections.sort(remaining, (p1, p2) -> Double.compare(p1.x - p1.y, p2.x - p2.y));
-        Point topRight = remaining.get(1);
-        Point bottomLeft = remaining.get(0);
-
-        return new Point[]{topLeft, topRight, bottomRight, bottomLeft};
     }
 
     private void pickImage() {
@@ -820,7 +721,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
             Canvas canvas = new Canvas(pencilBitmap);
             Paint paint = new Paint();
             ColorMatrix colorMatrix = new ColorMatrix();
-            colorMatrix.setSaturation(0);
+            colorMatrix.setSaturation(0); // Преобразование в чёрно-белое
             ColorMatrixColorFilter filter = new ColorMatrixColorFilter(colorMatrix);
             paint.setColorFilter(filter);
             canvas.drawBitmap(originalBitmap, 0, 0, paint);
@@ -839,7 +740,7 @@ public class MainActivity extends AppCompatActivity implements LayerAdapter.OnLa
             pencilBitmap.getPixels(pixels, 0, originalBitmap.getWidth(), 0, 0, originalBitmap.getWidth(), originalBitmap.getHeight());
 
             for (int i = 0; i < pixels.length; i++) {
-                int gray = Color.red(pixels[i]);
+                int gray = Color.red(pixels[i]); // Простое преобразование в градации серого
                 int layerIndex = getLayerIndex(gray);
                 if (layerIndex >= 0 && layerIndex < 20 && layerBitmaps[layerIndex] != null) {
                     layerBitmaps[layerIndex].setPixel(i % originalBitmap.getWidth(), i / originalBitmap.getWidth(), pixels[i]);
