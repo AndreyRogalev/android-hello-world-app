@@ -39,6 +39,11 @@ jobs:
         run: chmod +x gradlew
         shell: bash
 
+      # ДОБАВЛЕН НОВЫЙ ШАГ ОЧИСТКИ:
+      - name: Clean Gradle project
+        run: ./gradlew clean
+
+
       # Запуск сборки Debug APK
       - name: Build with Gradle
         run: ./gradlew assembleDebug
