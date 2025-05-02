@@ -18,7 +18,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
+         # cache: gradle
 
       # Настройка Android SDK на сервере GitHub
       - name: Setup Android SDK
